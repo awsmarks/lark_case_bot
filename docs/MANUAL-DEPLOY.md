@@ -540,7 +540,7 @@ aws lambda create-function \
 2. 点击 **Create API** → **REST API** → **Build**
 3. 配置：
    - API name: `LarkCaseBot-API`
-   - Endpoint Type: Regional
+   - Endpoint Type: Edge-optimized
 4. 创建资源：
    - 点击 **Create Resource**
    - Resource name: `messages`
