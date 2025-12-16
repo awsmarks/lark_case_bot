@@ -54,6 +54,8 @@
 |---------|------|------|
 | Secrets Manager | LarkCaseBot-app-id | 存储 Lark App ID |
 | Secrets Manager | LarkCaseBot-app-secret | 存储 Lark App Secret |
+| Secrets Manager | LarkCaseBot-encrypt-key | 存储 Lark Encrypt Key（可选，用于事件解密） |
+| Secrets Manager | LarkCaseBot-verification-token | 存储 Lark Verification Token（用于请求验证） |
 | S3 | LarkCaseBot-DataBucket | Bot 配置和工单数据存储 |
 | IAM Role | LarkCaseBot-MsgEventRole | MsgEventLambda 执行角色 |
 | IAM Role | LarkCaseBot-CaseUpdateRole | CaseUpdateLambda 执行角色 |
@@ -129,6 +131,50 @@ aws secretsmanager create-secret \
   --secret-string '{"app_secret":"xxxxxxxxxxxxxxxx"}'
 ```
 
+### 1.3 创建 Encrypt Key Secret（可选）
+
+用于解密 Lark 事件（如果启用了加密）。
+
+**Console 方式：**
+
+1. 重复上述步骤
+2. 点击 **Plaintext** 标签，输入：
+   ```json
+   {"encrypt_key":""}
+   ```
+   > 💡 如果不使用加密，保持空字符串即可
+3. Secret name: `LarkCaseBot-encrypt-key`
+
+**CLI 方式：**
+
+```bash
+aws secretsmanager create-secret \
+  --name LarkCaseBot-encrypt-key \
+  --secret-string '{"encrypt_key":""}'
+```
+
+### 1.4 创建 Verification Token Secret
+
+用于验证请求来源。
+
+**Console 方式：**
+
+1. 重复上述步骤
+2. 点击 **Plaintext** 标签，输入：
+   ```json
+   {"verification_token":"xxxxxxxxxxxxxxxx"}
+   ```
+   > 从 Lark 开放平台 → 事件订阅页面获取 Verification Token
+3. Secret name: `LarkCaseBot-verification-token`
+
+**CLI 方式：**
+
+```bash
+aws secretsmanager create-secret \
+  --name LarkCaseBot-verification-token \
+  --secret-string '{"verification_token":"xxxxxxxxxxxxxxxx"}'
+```
+
 ---
 
 ## Step 2: 创建 S3 存储桶
@@ -185,6 +231,18 @@ aws s3api put-public-access-block \
     "IgnorePublicAcls": true,
     "BlockPublicPolicy": true,
     "RestrictPublicBuckets": true
+  }'
+
+# 配置生命周期规则（30天后删除旧版本）
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket ${BUCKET_NAME} \
+  --lifecycle-configuration '{
+    "Rules": [{
+      "ID": "DeleteOldVersions",
+      "Status": "Enabled",
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 30},
+      "Filter": {"Prefix": ""}
+    }]
   }'
 
 echo "Bucket created: ${BUCKET_NAME}"
@@ -321,7 +379,9 @@ aws iam attach-role-policy \
       "Action": ["secretsmanager:GetSecretValue"],
       "Resource": [
         "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-id*",
-        "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-secret*"
+        "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-secret*",
+        "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-encrypt-key*",
+        "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-verification-token*"
       ]
     },
     {
@@ -582,6 +642,8 @@ cd ..
 |-----|-------|------|
 | APP_ID_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-id-XXXXX` | Lark App ID |
 | APP_SECRET_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-secret-XXXXX` | Lark App Secret |
+| ENCRYPT_KEY_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-encrypt-key-XXXXX` | Lark Encrypt Key（可选） |
+| VERIFICATION_TOKEN_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-verification-token-XXXXX` | Lark Verification Token |
 | DATA_BUCKET | `larkcasebot-data-ACCOUNT_ID` | S3 数据桶 |
 | CFG_KEY | `LarkBotProfile-0` | 配置键名 |
 | CASE_LANGUAGE | `zh` | 工单语言 (zh/en/ja/ko) |
@@ -638,6 +700,8 @@ aws lambda create-function \
   --environment "Variables={
     APP_ID_ARN=arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:LarkCaseBot-app-id-XXXXX,
     APP_SECRET_ARN=arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:LarkCaseBot-app-secret-XXXXX,
+    ENCRYPT_KEY_ARN=arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:LarkCaseBot-encrypt-key-XXXXX,
+    VERIFICATION_TOKEN_ARN=arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:LarkCaseBot-verification-token-XXXXX,
     DATA_BUCKET=larkcasebot-data-${ACCOUNT_ID},
     CFG_KEY=LarkBotProfile-0,
     CASE_LANGUAGE=zh,
@@ -713,7 +777,6 @@ aws lambda create-function \
 | APP_ID_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-id-XXXXX` | Lark App ID |
 | APP_SECRET_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-secret-XXXXX` | Lark App Secret |
 | DATA_BUCKET | `larkcasebot-data-ACCOUNT_ID` | S3 数据桶 |
-| CFG_KEY | `LarkBotProfile-0` | 配置键名 |
 | AUTO_DISSOLVE_HOURS | `72` | 工单解决后自动解散群的小时数 |
 
 **CLI 方式：**
@@ -734,7 +797,6 @@ aws lambda create-function \
     APP_ID_ARN=arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:LarkCaseBot-app-id-XXXXX,
     APP_SECRET_ARN=arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:LarkCaseBot-app-secret-XXXXX,
     DATA_BUCKET=larkcasebot-data-${ACCOUNT_ID},
-    CFG_KEY=LarkBotProfile-0,
     AUTO_DISSOLVE_HOURS=72
   }"
 ```
@@ -793,8 +855,10 @@ aws lambda create-function \
 |-----|------|--------------|
 | `APP_ID_ARN` | Lark App ID 的 Secrets Manager ARN | 全部 |
 | `APP_SECRET_ARN` | Lark App Secret 的 Secrets Manager ARN | 全部 |
+| `ENCRYPT_KEY_ARN` | Lark Encrypt Key 的 Secrets Manager ARN（可选） | MsgEvent |
+| `VERIFICATION_TOKEN_ARN` | Lark Verification Token 的 Secrets Manager ARN | MsgEvent |
 | `DATA_BUCKET` | S3 数据桶名称 | 全部 |
-| `CFG_KEY` | S3 配置键名 | MsgEvent, CasePoller |
+| `CFG_KEY` | S3 配置键名 | MsgEvent |
 | `CASE_LANGUAGE` | 工单语言 (zh/en/ja/ko) | MsgEvent |
 | `USER_WHITELIST` | 是否启用用户白名单 | MsgEvent |
 | `AUTO_DISSOLVE_HOURS` | 工单解决后自动解散群的小时数 | CaseUpdate, CasePoller, GroupCleanup |
