@@ -162,8 +162,7 @@ class LarkCaseBotStack(Stack):
             ]
         )
 
-        # Note: AWSSupportAccessRole is optional and created manually for single-account setup
-        # For cross-account setup, use LarkSupportCaseApiAll role in target accounts
+        # Note: LarkCaseBot-SupportApiRole is created in target accounts for Support API access
         # See docs/manual-account-setup.md for details
 
         # Grant permissions
@@ -180,10 +179,7 @@ class LarkCaseBotStack(Stack):
             sid="AllowToAssumeToRoleWithSupportAPIAccess",
             effect=iam.Effect.ALLOW,
             actions=["sts:AssumeRole"],
-            resources=[
-                "arn:aws:iam::*:role/LarkSupportCaseApiAll*",
-                "arn:aws:iam::*:role/AWSSupportAccessRole"
-            ]
+            resources=["arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"]
         ))
 
         # Cost Explorer access removed - using static service list instead
@@ -235,10 +231,7 @@ class LarkCaseBotStack(Stack):
             sid="AllowAssumeRoleForCommunication",
             effect=iam.Effect.ALLOW,
             actions=["sts:AssumeRole"],
-            resources=[
-                "arn:aws:iam::*:role/AWSSupportAccessRole",
-                "arn:aws:iam::*:role/LarkSupportCaseApiAll*"
-            ]
+            resources=["arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"]
         ))
 
         case_update_lambda = lambda_.Function(self, "CaseUpdateLambda",
@@ -285,10 +278,7 @@ class LarkCaseBotStack(Stack):
             sid="AllowAssumeRoleForCasePolling",
             effect=iam.Effect.ALLOW,
             actions=["sts:AssumeRole"],
-            resources=[
-                "arn:aws:iam::*:role/AWSSupportAccessRole",
-                "arn:aws:iam::*:role/LarkSupportCaseApiAll*"
-            ]
+            resources=["arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"]
         ))
 
         case_poller_lambda = lambda_.Function(self, "CasePollerLambda",
@@ -418,8 +408,8 @@ class LarkCaseBotStack(Stack):
             description="Secrets Manager ARN for Lark Verification Token"
         )
 
-        # Note: AWSSupportAccessRole output removed - role is optional and created manually
-        # For cross-account setup, create LarkSupportCaseApiAll role in target accounts
+        # Note: Create LarkCaseBot-SupportApiRole in target accounts for Support API access
+        # See docs/manual-account-setup.md for details
         
         CfnOutput(self, "CasePollIntervalOutput",
             value=case_poll_interval.value_as_string,
