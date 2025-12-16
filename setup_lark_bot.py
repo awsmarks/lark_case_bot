@@ -23,7 +23,7 @@ from typing import Dict, Any, List, Optional
 from i18n import t, set_lang
 
 CONFIG_FILE = 'accounts.json'
-ROLE_NAME = 'LarkSupportCaseApiAll'
+ROLE_NAME = 'LarkCaseBot-SupportApiRole'
 REGION = 'us-east-1'
 
 
