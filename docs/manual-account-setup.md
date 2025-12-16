@@ -71,7 +71,7 @@ arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXX
 5. 点击 "Next"
 6. 搜索并选择策略：`AWSSupportAccess`
 7. 点击 "Next"
-8. 角色名称输入：`LarkSupportCaseApiAll`
+8. 角色名称输入：`LarkCaseBot-SupportApiRole`
 9. 描述（可选）：`Lark bot cross-account support access`
 10. 点击 "Create role"
 
@@ -83,7 +83,7 @@ arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXX
 # 设置变量
 LAMBDA_ROLE_ARN="arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXXX"
 TARGET_ACCOUNT_ID="123456789012"  # 目标账号 ID
-ROLE_NAME="LarkSupportCaseApiAll"
+ROLE_NAME="LarkCaseBot-SupportApiRole"
 
 # 创建信任策略文件
 cat > trust-policy.json <<EOF
@@ -137,7 +137,7 @@ Resources:
   LarkSupportRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: LarkSupportCaseApiAll
+      RoleName: LarkCaseBot-SupportApiRole
       Description: Lark bot cross-account support access
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -180,15 +180,15 @@ aws cloudformation create-stack \
   "cfg_key": "LarkBotProfile-0",
   "accounts": {
     "0": {
-      "role_arn": "arn:aws:iam::111122223333:role/AWSSupportAccessRole",
+      "role_arn": "arn:aws:iam::111122223333:role/LarkCaseBot-SupportApiRole",
       "account_name": "primary"
     },
     "1": {
-      "role_arn": "arn:aws:iam::123456789012:role/LarkSupportCaseApiAll",
+      "role_arn": "arn:aws:iam::123456789012:role/LarkCaseBot-SupportApiRole",
       "account_name": "production"
     },
     "2": {
-      "role_arn": "arn:aws:iam::210987654321:role/LarkSupportCaseApiAll",
+      "role_arn": "arn:aws:iam::210987654321:role/LarkCaseBot-SupportApiRole",
       "account_name": "staging"
     }
   }
@@ -213,7 +213,7 @@ aws s3 cp s3://${BUCKET_NAME}/config/LarkBotProfile-0.json current-config.json
 # 示例：使用 jq 添加新账号
 jq '.accounts += {
   "2": {
-    "role_arn": "arn:aws:iam::123456789012:role/LarkSupportCaseApiAll",
+    "role_arn": "arn:aws:iam::123456789012:role/LarkCaseBot-SupportApiRole",
     "account_name": "production"
   }
 }' current-config.json > updated-config.json
@@ -261,7 +261,7 @@ def add_account(account_id, account_name, region='us-east-1'):
     next_index = str(len(accounts))
     
     # 构造角色 ARN
-    role_arn = f"arn:aws:iam::{account_id}:role/LarkSupportCaseApiAll"
+    role_arn = f"arn:aws:iam::{account_id}:role/LarkCaseBot-SupportApiRole"
     
     # 添加新账号
     accounts[next_index] = {
@@ -327,7 +327,7 @@ export AWS_SECRET_ACCESS_KEY=$(echo $TEMP_CREDS | awk '{print $2}')
 export AWS_SESSION_TOKEN=$(echo $TEMP_CREDS | awk '{print $3}')
 
 # 尝试假设目标账号角色
-TARGET_ROLE_ARN="arn:aws:iam::123456789012:role/LarkSupportCaseApiAll"
+TARGET_ROLE_ARN="arn:aws:iam::123456789012:role/LarkCaseBot-SupportApiRole"
 aws sts assume-role \
   --role-arn ${TARGET_ROLE_ARN} \
   --role-session-name test-cross-account
@@ -354,7 +354,7 @@ unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 2. 在目标账号更新信任策略：
 ```bash
 aws iam update-assume-role-policy \
-  --role-name LarkSupportCaseApiAll \
+  --role-name LarkCaseBot-SupportApiRole \
   --policy-document file://trust-policy.json
 ```
 
@@ -374,7 +374,7 @@ aws iam update-assume-role-policy \
 **解决**：
 ```bash
 aws iam attach-role-policy \
-  --role-name LarkSupportCaseApiAll \
+  --role-name LarkCaseBot-SupportApiRole \
   --policy-arn arn:aws:iam::aws:policy/AWSSupportAccess
 ```
 
