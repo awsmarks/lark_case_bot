@@ -397,10 +397,7 @@ aws iam attach-role-policy \
       "Sid": "AssumeRoleForSupport",
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": [
-        "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole",
-        "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"
-      ]
+      "Resource": "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"
     },
     {
       "Sid": "LambdaSelfInvoke",
@@ -412,9 +409,7 @@ aws iam attach-role-policy \
 }
 ```
 
-> 💡 **About `*` in AssumeRole**: 
-> - `arn:aws:iam::*:role/LarkCaseBot-SupportApiRole` allows access to Support API roles in any account. If only specific accounts need support, replace with specific account ID list, like: `arn:aws:iam::111122223333:role/LarkCaseBot-SupportApiRole`
-> - `LarkCaseBot-SupportApiRole` uses `*` to match possible role name suffixes
+> 💡 **About `*` in AssumeRole**: `arn:aws:iam::*:role/LarkCaseBot-SupportApiRole` allows access to Support API roles in any account. If only specific accounts need support, replace with specific account ID list, like: `arn:aws:iam::111122223333:role/LarkCaseBot-SupportApiRole`
 
 **CLI Method:**
 
@@ -469,7 +464,7 @@ aws iam put-role-policy \
       "Sid": "AssumeRoleForSupport",
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": ["arn:aws:iam::*:role/LarkCaseBot-SupportApiRole", "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"]
+      "Resource": "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"
     }
   ]
 }
@@ -525,7 +520,7 @@ aws iam put-role-policy \
       "Sid": "AssumeRoleForSupport",
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": ["arn:aws:iam::*:role/LarkCaseBot-SupportApiRole", "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"]
+      "Resource": "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"
     }
   ]
 }
@@ -1400,5 +1395,3 @@ aws secretsmanager delete-secret --secret-id LarkCaseBot-app-secret --force-dele
 ```
 
 ---
-
-**Last Updated**: 2025-12-16
