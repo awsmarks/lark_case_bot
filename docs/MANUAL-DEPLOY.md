@@ -61,7 +61,7 @@
 | IAM Role | LarkCaseBot-CaseUpdateRole | CaseUpdateLambda 执行角色 |
 | IAM Role | LarkCaseBot-CasePollerRole | CasePollerLambda 执行角色 |
 | IAM Role | LarkCaseBot-GroupCleanupRole | GroupCleanupLambda 执行角色 |
-| IAM Role | AWSSupportAccessRole | AWS Support API 访问 |
+| IAM Role | LarkCaseBot-SupportApiRole | AWS Support API 访问 |
 | Lambda | LarkCaseBot-MsgEvent | 处理 Lark 消息 |
 | Lambda | LarkCaseBot-CaseUpdate | 处理工单更新事件 |
 | Lambda | LarkCaseBot-CasePoller | 定期轮询工单状态 |
@@ -269,7 +269,7 @@ larkcasebot-data-{account-id}/
 
 ## Step 3: 创建 IAM 角色
 
-### 3.1 创建 AWSSupportAccessRole
+### 3.1 创建 LarkCaseBot-SupportApiRole
 
 这是访问 AWS Support API 的角色。
 
@@ -313,12 +313,12 @@ larkcasebot-data-{account-id}/
 ```bash
 # 创建角色
 aws iam create-role \
-  --role-name AWSSupportAccessRole \
+  --role-name LarkCaseBot-SupportApiRole \
   --assume-role-policy-document file://trust-policy.json
 
 # 附加 AWSSupportAccess 策略
 aws iam attach-role-policy \
-  --role-name AWSSupportAccessRole \
+  --role-name LarkCaseBot-SupportApiRole \
   --policy-arn arn:aws:iam::aws:policy/AWSSupportAccess
 ```
 
@@ -398,8 +398,8 @@ aws iam attach-role-policy \
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
       "Resource": [
-        "arn:aws:iam::*:role/AWSSupportAccessRole",
-        "arn:aws:iam::*:role/LarkSupportCaseApiAll*"
+        "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole",
+        "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"
       ]
     },
     {
@@ -413,8 +413,8 @@ aws iam attach-role-policy \
 ```
 
 > 💡 **关于 AssumeRole 中的 `*`**: 
-> - `arn:aws:iam::*:role/AWSSupportAccessRole` 允许访问任意账户的 Support API 角色。如果只需支持特定账户，可替换为具体账户 ID 列表，如：`arn:aws:iam::111122223333:role/AWSSupportAccessRole`
-> - `LarkSupportCaseApiAll*` 中的 `*` 用于匹配可能的角色名后缀
+> - `arn:aws:iam::*:role/LarkCaseBot-SupportApiRole` 允许访问任意账户的 Support API 角色。如果只需支持特定账户，可替换为具体账户 ID 列表，如：`arn:aws:iam::111122223333:role/LarkCaseBot-SupportApiRole`
+> - `LarkCaseBot-SupportApiRole` 中的 `*` 用于匹配可能的角色名后缀
 
 **CLI 方式：**
 
@@ -469,7 +469,7 @@ aws iam put-role-policy \
       "Sid": "AssumeRoleForSupport",
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": ["arn:aws:iam::*:role/AWSSupportAccessRole", "arn:aws:iam::*:role/LarkSupportCaseApiAll*"]
+      "Resource": ["arn:aws:iam::*:role/LarkCaseBot-SupportApiRole", "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"]
     }
   ]
 }
@@ -525,7 +525,7 @@ aws iam put-role-policy \
       "Sid": "AssumeRoleForSupport",
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": ["arn:aws:iam::*:role/AWSSupportAccessRole", "arn:aws:iam::*:role/LarkSupportCaseApiAll*"]
+      "Resource": ["arn:aws:iam::*:role/LarkCaseBot-SupportApiRole", "arn:aws:iam::*:role/LarkCaseBot-SupportApiRole"]
     }
   ]
 }
@@ -1276,7 +1276,7 @@ aws iam get-role --role-name LarkCaseBot-EventBridgeRole
   "cfg_key": "LarkBotProfile-0",
   "accounts": {
     "0": {
-      "role_arn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/AWSSupportAccessRole",
+      "role_arn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/LarkCaseBot-SupportApiRole",
       "account_name": "主账号"
     }
   },
@@ -1297,7 +1297,7 @@ cat > /tmp/config.json <<EOF
   "cfg_key": "LarkBotProfile-0",
   "accounts": {
     "0": {
-      "role_arn": "arn:aws:iam::${ACCOUNT_ID}:role/AWSSupportAccessRole",
+      "role_arn": "arn:aws:iam::${ACCOUNT_ID}:role/LarkCaseBot-SupportApiRole",
       "account_name": "主账号"
     }
   },
