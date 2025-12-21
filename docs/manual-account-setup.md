@@ -2,40 +2,66 @@
 
 如果你无法使用 `setup_lark_bot.py` 脚本自动创建 IAM 角色（例如权限不足或没有配置 AWS Profile），可以按照以下步骤手动添加账号。
 
-> **注意**: 此版本使用 S3 存储配置数据。
+> **注意**: 此指南适用于 **CDK 部署** 和 **手动部署** 两种方式。
 
 ## 前置条件
 
-1. 已部署 LarkCaseBotStack
-2. 知道主账号的 Lambda Role ARN（从 CloudFormation Outputs 获取）
-3. 对目标账号有 IAM 管理权限
+1. 已部署 LarkCaseBot（通过 CDK 或手动部署）
+2. 知道主账号的 Lambda Role ARN
+3. 对其他账号有 IAM 管理权限
 
 ## 步骤 1: 获取 Lambda Role ARN
 
-在主账号（部署 LarkCaseBotStack 的账号）执行：
+### CDK 部署方式
+
+在主账号执行：
 
 ```bash
+# 获取 MsgEventRole ARN
 aws cloudformation describe-stacks \
   --stack-name LarkCaseBotStack \
   --query 'Stacks[0].Outputs[?OutputKey==`msgEventRoleArn`].OutputValue' \
+  --output text
+
+# 获取 CasePollerRole ARN
+aws cloudformation describe-stacks \
+  --stack-name LarkCaseBotStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`CasePollerRoleArn`].OutputValue' \
   --output text
 ```
 
 输出示例：
 ```
 arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXXX
+arn:aws:iam::111122223333:role/LarkCaseBotStack-CasePollerRoleXXXXXXXX-XXXXXXXXXXXX
 ```
 
-记下这个 ARN，后续步骤需要用到。
+### 手动部署方式
 
-## 步骤 2: 在目标账号创建 IAM 角色
+如果使用 MANUAL-DEPLOY.md 手动部署，角色名称是固定的：
+
+```bash
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# MsgEventRole ARN
+echo "arn:aws:iam::${ACCOUNT_ID}:role/LarkCaseBot-MsgEventRole"
+
+# CasePollerRole ARN
+echo "arn:aws:iam::${ACCOUNT_ID}:role/LarkCaseBot-CasePollerRole"
+```
+
+记下这两个 ARN，后续步骤需要用到。
+
+## 步骤 2: 在其他账号创建 IAM 角色
 
 ### 方式 1: 使用 AWS Console（推荐）
 
-1. 登录到**目标账号**的 AWS Console
+1. 登录到**其他账号**的 AWS Console
 2. 进入 IAM 服务
 3. 点击左侧菜单 "Roles" → "Create role"
-4. 选择 "Custom trust policy"，粘贴以下内容（替换 `<LAMBDA_ROLE_ARN>`）：
+4. 选择 "Custom trust policy"，粘贴以下内容：
+
+**CDK 部署 - 替换 `<MSGEVENT_ROLE_ARN>` 和 `<CASEPOLLER_ROLE_ARN>`：**
 
 ```json
 {
@@ -44,7 +70,10 @@ arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXX
     {
       "Effect": "Allow",
       "Principal": {
-        "AWS": "<LAMBDA_ROLE_ARN>"
+        "AWS": [
+          "<MSGEVENT_ROLE_ARN>",
+          "<CASEPOLLER_ROLE_ARN>"
+        ]
       },
       "Action": "sts:AssumeRole"
     }
@@ -52,7 +81,8 @@ arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXX
 }
 ```
 
-例如：
+**手动部署 - 替换 `<ACCOUNT_ID>` 为主账号 ID：**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -60,7 +90,10 @@ arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXX
     {
       "Effect": "Allow",
       "Principal": {
-        "AWS": "arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXXX"
+        "AWS": [
+          "arn:aws:iam::<ACCOUNT_ID>:role/LarkCaseBot-MsgEventRole",
+          "arn:aws:iam::<ACCOUNT_ID>:role/LarkCaseBot-CasePollerRole"
+        ]
       },
       "Action": "sts:AssumeRole"
     }
@@ -77,12 +110,15 @@ arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXX
 
 ### 方式 2: 使用 AWS CLI
 
-在目标账号执行（需要先配置对应的 AWS Profile）：
+在其他账号执行（需要先配置对应的 AWS Profile）：
+
+**CDK 部署：**
 
 ```bash
-# 设置变量
-LAMBDA_ROLE_ARN="arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXXX"
-TARGET_ACCOUNT_ID="123456789012"  # 目标账号 ID
+# 设置变量（从步骤 1 获取）
+MSGEVENT_ROLE_ARN="arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXXX"
+CASEPOLLER_ROLE_ARN="arn:aws:iam::111122223333:role/LarkCaseBotStack-CasePollerRoleXXXXXXXX-XXXXXXXXXXXX"
+OTHER_ACCOUNT_ID="123456789012"
 ROLE_NAME="LarkCaseBot-SupportApiRole"
 
 # 创建信任策略文件
@@ -93,7 +129,10 @@ cat > trust-policy.json <<EOF
     {
       "Effect": "Allow",
       "Principal": {
-        "AWS": "${LAMBDA_ROLE_ARN}"
+        "AWS": [
+          "${MSGEVENT_ROLE_ARN}",
+          "${CASEPOLLER_ROLE_ARN}"
+        ]
       },
       "Action": "sts:AssumeRole"
     }
@@ -115,8 +154,51 @@ aws iam attach-role-policy \
 # 清理临时文件
 rm trust-policy.json
 
-# 输出角色 ARN
-echo "Role ARN: arn:aws:iam::${TARGET_ACCOUNT_ID}:role/${ROLE_NAME}"
+echo "Role ARN: arn:aws:iam::${OTHER_ACCOUNT_ID}:role/${ROLE_NAME}"
+```
+
+**手动部署：**
+
+```bash
+# 设置变量
+MAIN_ACCOUNT_ID="111122223333"  # 主账号 ID
+OTHER_ACCOUNT_ID="123456789012"
+ROLE_NAME="LarkCaseBot-SupportApiRole"
+
+# 创建信任策略文件
+cat > trust-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+          "arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-MsgEventRole",
+          "arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-CasePollerRole"
+        ]
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+
+# 创建角色
+aws iam create-role \
+  --role-name ${ROLE_NAME} \
+  --assume-role-policy-document file://trust-policy.json \
+  --description "Lark bot cross-account support access"
+
+# 附加策略
+aws iam attach-role-policy \
+  --role-name ${ROLE_NAME} \
+  --policy-arn arn:aws:iam::aws:policy/AWSSupportAccess
+
+# 清理临时文件
+rm trust-policy.json
+
+echo "Role ARN: arn:aws:iam::${OTHER_ACCOUNT_ID}:role/${ROLE_NAME}"
 ```
 
 ### 方式 3: 使用 CloudFormation
@@ -128,10 +210,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Cross-account IAM role for Lark Case Bot'
 
 Parameters:
-  LambdaRoleArn:
+  MsgEventRoleArn:
     Type: String
-    Description: ARN of the Lambda role in the main account
-    Default: arn:aws:iam::111122223333:role/LarkCaseBotStack-MsgEventRoleXXXXXXXX-XXXXXXXXXXXX
+    Description: ARN of the MsgEventRole in the main account
+  CasePollerRoleArn:
+    Type: String
+    Description: ARN of the CasePollerRole in the main account
 
 Resources:
   LarkSupportRole:
@@ -144,7 +228,9 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Ref LambdaRoleArn
+              AWS:
+                - !Ref MsgEventRoleArn
+                - !Ref CasePollerRoleArn
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AWSSupportAccess
@@ -155,22 +241,55 @@ Outputs:
     Value: !GetAtt LarkSupportRole.Arn
 ```
 
-部署：
+**CDK 部署：**
 ```bash
 aws cloudformation create-stack \
   --stack-name LarkCaseBotCrossAccountRole \
   --template-body file://cross-account-role.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameters ParameterKey=LambdaRoleArn,ParameterValue=<LAMBDA_ROLE_ARN>
+  --parameters \
+    ParameterKey=MsgEventRoleArn,ParameterValue=<MSGEVENT_ROLE_ARN> \
+    ParameterKey=CasePollerRoleArn,ParameterValue=<CASEPOLLER_ROLE_ARN>
+```
+
+**手动部署：**
+```bash
+MAIN_ACCOUNT_ID="111122223333"  # 替换为主账号 ID
+
+aws cloudformation create-stack \
+  --stack-name LarkCaseBotCrossAccountRole \
+  --template-body file://cross-account-role.yaml \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameters \
+    ParameterKey=MsgEventRoleArn,ParameterValue=arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-MsgEventRole \
+    ParameterKey=CasePollerRoleArn,ParameterValue=arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-CasePollerRole
 ```
 
 ## 步骤 3: 将账号信息添加到 S3
+
+### 获取 S3 存储桶名称
+
+**CDK 部署：**
+```bash
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name LarkCaseBotStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`DataBucketName`].OutputValue' \
+  --output text)
+echo "Bucket: ${BUCKET_NAME}"
+```
+
+**手动部署：**
+```bash
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+BUCKET_NAME="larkcasebot-data-${ACCOUNT_ID}"
+echo "Bucket: ${BUCKET_NAME}"
+```
 
 ### 方式 1: 使用 AWS Console
 
 1. 登录到**主账号**的 AWS Console
 2. 进入 S3 服务
-3. 找到存储桶：`larkcasebotstack-databucketXXXXX-XXXXX`
+3. 找到存储桶（名称见上方命令输出）
 4. 进入 `config/` 目录
 5. 下载 `LarkBotProfile-0.json` 文件
 6. 编辑 JSON 文件，在 `accounts` 中添加新账号：
@@ -200,11 +319,7 @@ aws cloudformation create-stack \
 ### 方式 2: 使用 AWS CLI
 
 ```bash
-# 获取存储桶名
-BUCKET_NAME=$(aws cloudformation describe-stacks \
-  --stack-name LarkCaseBotStack \
-  --query 'Stacks[0].Outputs[?OutputKey==`DataBucketName`].OutputValue' \
-  --output text)
+# 获取存储桶名（使用上方命令获取 BUCKET_NAME）
 
 # 下载当前配置
 aws s3 cp s3://${BUCKET_NAME}/config/LarkBotProfile-0.json current-config.json
@@ -305,7 +420,7 @@ python add_account_manual.py 123456789012 production
 
 ### 验证角色可以被假设
 
-在主账号执行：
+**CDK 部署：**
 
 ```bash
 # 获取 Lambda Role ARN
@@ -326,7 +441,36 @@ export AWS_ACCESS_KEY_ID=$(echo $TEMP_CREDS | awk '{print $1}')
 export AWS_SECRET_ACCESS_KEY=$(echo $TEMP_CREDS | awk '{print $2}')
 export AWS_SESSION_TOKEN=$(echo $TEMP_CREDS | awk '{print $3}')
 
-# 尝试假设目标账号角色
+# 尝试假设其他账号角色
+TARGET_ROLE_ARN="arn:aws:iam::123456789012:role/LarkCaseBot-SupportApiRole"
+aws sts assume-role \
+  --role-arn ${TARGET_ROLE_ARN} \
+  --role-session-name test-cross-account
+
+# 如果成功，会返回临时凭证
+# 清理环境变量
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+```
+
+**手动部署：**
+
+```bash
+MAIN_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+LAMBDA_ROLE_ARN="arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-MsgEventRole"
+
+# 假设 Lambda 角色
+TEMP_CREDS=$(aws sts assume-role \
+  --role-arn ${LAMBDA_ROLE_ARN} \
+  --role-session-name test-session \
+  --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+  --output text)
+
+# 设置临时凭证
+export AWS_ACCESS_KEY_ID=$(echo $TEMP_CREDS | awk '{print $1}')
+export AWS_SECRET_ACCESS_KEY=$(echo $TEMP_CREDS | awk '{print $2}')
+export AWS_SESSION_TOKEN=$(echo $TEMP_CREDS | awk '{print $3}')
+
+# 尝试假设其他账号角色
 TARGET_ROLE_ARN="arn:aws:iam::123456789012:role/LarkCaseBot-SupportApiRole"
 aws sts assume-role \
   --role-arn ${TARGET_ROLE_ARN} \
@@ -351,7 +495,7 @@ unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 
 **解决**：
 1. 确认 Lambda Role ARN 是否正确
-2. 在目标账号更新信任策略：
+2. 在其他账号更新信任策略：
 ```bash
 aws iam update-assume-role-policy \
   --role-name LarkCaseBot-SupportApiRole \
@@ -418,8 +562,55 @@ done
 
 手动添加账号的核心步骤：
 1. ✅ 获取主账号的 Lambda Role ARN
-2. ✅ 在目标账号创建 IAM 角色（带信任策略和 AWSSupportAccess 策略）
+2. ✅ 在其他账号创建 IAM 角色（带信任策略和 AWSSupportAccess 策略）
 3. ✅ 将账号信息添加到主账号的 S3 配置文件
 4. ✅ 验证配置是否正确
 
 如果遇到问题，可以使用 `setup_lark_bot.py verify --roles` 命令验证所有角色的可访问性。
+
+---
+
+## 步骤 5: 配置跨账号 EventBridge（可选）
+
+> **注意**: 此步骤是**可选的**。如果不配置，CasePoller 仍会每 10 分钟轮询所有账号的工单更新。配置 EventBridge 可实现**实时通知**（秒级延迟）。
+
+详细步骤请参考：
+- **CDK 部署**: 运行 `setup_lark_bot.py setup` 会自动配置
+- **手动部署**: 参考 [MANUAL-DEPLOY.md 第 6.4 节](MANUAL-DEPLOY.md#64-跨账号-eventbridge-配置可选)
+
+### 快速概述
+
+在**其他账号**（非主账号）配置 EventBridge 规则，将 AWS Support 事件转发到主账号：
+
+```bash
+# 在其他账号执行
+MAIN_ACCOUNT_ID="111122223333"  # 主账号 ID
+OTHER_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# 1. 创建 EventBridge 规则
+aws events put-rule \
+  --name "LarkCaseBot-ForwardSupportEvents" \
+  --event-pattern '{
+    "source": ["aws.support"],
+    "detail-type": ["Support Case Update"]
+  }' \
+  --region us-east-1
+
+# 2. 添加目标（主账号的 Event Bus）
+# CDK 部署使用自定义 Event Bus，手动部署使用 default
+EVENT_BUS_ARN="arn:aws:events:us-east-1:${MAIN_ACCOUNT_ID}:event-bus/default"
+
+aws events put-targets \
+  --rule "LarkCaseBot-ForwardSupportEvents" \
+  --targets "Id"="MainAccountEventBus","Arn"="${EVENT_BUS_ARN}","RoleArn"="arn:aws:iam::${OTHER_ACCOUNT_ID}:role/LarkCaseBot-EventBridgeRole" \
+  --region us-east-1
+```
+
+### 为什么是可选的？
+
+| 配置方式 | 实时通知 | 延迟 | 复杂度 |
+|---------|---------|------|--------|
+| 仅 CasePoller | ❌ | 最多 10 分钟 | 低 |
+| EventBridge + CasePoller | ✅ | 秒级 | 中 |
+
+CasePoller 作为**备份机制**，确保即使 EventBridge 配置有问题，工单更新也不会丢失。
