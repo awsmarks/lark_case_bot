@@ -639,7 +639,7 @@ cd ..
 | APP_SECRET_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-secret-XXXXX` | Lark App Secret |
 | ENCRYPT_KEY_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-encrypt-key-XXXXX` | Lark Encrypt Key (optional) |
 | VERIFICATION_TOKEN_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-verification-token-XXXXX` | Lark Verification Token |
-| DATA_BUCKET | `larkcasebot-data-ACCOUNT_ID` | S3 data bucket |
+| DATA_BUCKET | `larkcasebot-data-ACCOUNT_ID` | S3 data bucket (bucket name only, not ARN) |
 | CFG_KEY | `LarkBotProfile-0` | Config key name |
 | CASE_LANGUAGE | `zh` | Case language (zh/en/ja/ko) |
 | USER_WHITELIST | `false` | Enable user whitelist |
@@ -647,6 +647,7 @@ cd ..
 > ⚠️ **Note**: 
 > - Replace `ACCOUNT_ID` with your actual AWS account ID
 > - The `-XXXXX` suffix in Secret ARN is auto-generated; copy the full ARN from Secrets Manager
+> - `DATA_BUCKET` requires only the bucket name (e.g., `larkcasebot-data-123456789012`), not the full ARN
 
 **Console Method:**
 
@@ -725,7 +726,7 @@ aws lambda create-function \
 |-----|-------|-------------|
 | APP_ID_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-id-XXXXX` | Lark App ID |
 | APP_SECRET_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-secret-XXXXX` | Lark App Secret |
-| DATA_BUCKET | `larkcasebot-data-ACCOUNT_ID` | S3 data bucket |
+| DATA_BUCKET | `larkcasebot-data-ACCOUNT_ID` | S3 data bucket (bucket name only, not ARN) |
 | AUTO_DISSOLVE_HOURS | `72` | Hours after resolution to auto-dissolve group |
 
 **CLI Method:**
@@ -763,7 +764,7 @@ aws lambda create-function \
 | Execution Role | `LarkCaseBot-CasePollerRole` |
 | Timeout | 300 seconds (5 minutes) |
 | Memory | 512 MB |
-| Trigger | EventBridge rule `LarkCaseBot-Poller` (every 10 minutes) |
+| Trigger | EventBridge rule `LarkCaseBot-Poller` (every 5 minutes) |
 
 **Environment Variables:**
 
@@ -771,7 +772,7 @@ aws lambda create-function \
 |-----|-------|-------------|
 | APP_ID_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-id-XXXXX` | Lark App ID |
 | APP_SECRET_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-secret-XXXXX` | Lark App Secret |
-| DATA_BUCKET | `larkcasebot-data-ACCOUNT_ID` | S3 data bucket |
+| DATA_BUCKET | `larkcasebot-data-ACCOUNT_ID` | S3 data bucket (bucket name only, not ARN) |
 | AUTO_DISSOLVE_HOURS | `72` | Hours after resolution to auto-dissolve group |
 
 **CLI Method:**
@@ -817,7 +818,7 @@ aws lambda create-function \
 |-----|-------|-------------|
 | APP_ID_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-id-XXXXX` | Lark App ID |
 | APP_SECRET_ARN | `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:LarkCaseBot-app-secret-XXXXX` | Lark App Secret |
-| DATA_BUCKET | `larkcasebot-data-ACCOUNT_ID` | S3 data bucket |
+| DATA_BUCKET | `larkcasebot-data-ACCOUNT_ID` | S3 data bucket (bucket name only, not ARN) |
 | AUTO_DISSOLVE_HOURS | `72` | Hours after resolution to auto-dissolve group |
 
 **CLI Method:**
@@ -852,13 +853,15 @@ aws lambda create-function \
 | `APP_SECRET_ARN` | Secrets Manager ARN for Lark App Secret | All |
 | `ENCRYPT_KEY_ARN` | Secrets Manager ARN for Lark Encrypt Key | MsgEvent |
 | `VERIFICATION_TOKEN_ARN` | Secrets Manager ARN for Lark Verification Token | MsgEvent |
-| `DATA_BUCKET` | S3 data bucket name | All |
+| `DATA_BUCKET` | S3 data bucket name (bucket name only, not ARN) | All |
 | `CFG_KEY` | S3 config key name | MsgEvent |
 | `CASE_LANGUAGE` | Case language (zh/en/ja/ko) | MsgEvent |
 | `USER_WHITELIST` | Enable user whitelist | MsgEvent |
 | `AUTO_DISSOLVE_HOURS` | Hours after resolution to auto-dissolve group | CaseUpdate, CasePoller, GroupCleanup |
 
-> 💡 **Tip**: Set `AUTO_DISSOLVE_HOURS` to your desired value, e.g., 48 means auto-dissolve 48 hours after case resolution.
+> 💡 **Tip**: 
+> - Set `AUTO_DISSOLVE_HOURS` to your desired value, e.g., 48 means auto-dissolve 48 hours after case resolution.
+> - `DATA_BUCKET` requires only the bucket name (e.g., `larkcasebot-data-123456789012`), not the full ARN.
 
 ---
 
@@ -964,19 +967,19 @@ echo "Webhook URL: https://$API_ID.execute-api.us-east-1.amazonaws.com/prod/mess
 
 **Console Method:**
 
-1. Go to AWS Console → EventBridge → Rules (ensure you're in **us-east-1** region)
+1. Go to AWS Console → Amazon EventBridge → Rules (ensure you're in **us-east-1** region)
 2. Ensure Event bus is **default**
-3. Click **Create rule**
-4. Step 1 - Define rule detail:
-   - Name: `LarkCaseBot-CaseUpdate`
-   - Description: `Capture AWS Support case updates and push to Lark`
-   - Event bus: **default**
-   - Rule type: **Rule with an event pattern**
-   - Click **Next**
-5. Step 2 - Build event pattern:
-   - Event source: **AWS events or EventBridge partner events**
-   - Creation method: **Custom pattern (JSON editor)**
-   - Event pattern:
+3. Click **Create rule**, a Configuration dialog appears
+4. Fill in the dialog:
+   - **Rule name**: `LarkCaseBot-CaseUpdate`
+   - **Description**: `Capture AWS Support case updates and push to Lark` (optional)
+   - **Event bus name**: Keep `default`
+   - **Activation**: Keep **Active** checked
+5. Click **Create** to create the rule
+6. After creation, click the rule name to enter detail page
+7. In **Event pattern** section, click **Edit**:
+   - Select **Custom pattern (JSON editor)**
+   - Enter the following pattern:
 
 ```json
 {
@@ -985,19 +988,16 @@ echo "Webhook URL: https://$API_ID.execute-api.us-east-1.amazonaws.com/prod/mess
 }
 ```
 
-   - Click **Next**
-6. Step 3 - Select target(s):
+   - Click **Save**
+8. In **Targets** section, click **Edit**:
    - Target types: **AWS service**
    - Select a target: **Lambda function**
    - Function: `LarkCaseBot-CaseUpdate`
+   - Permissions: Keep default **Use execution role (recommended)**
    - ⚠️ If prompted **"Add permission to Lambda function"**, click **Allow** or **Add**
-   - Click **Next**
-7. Step 4 - Configure tags: (optional, skip)
-   - Click **Next**
-8. Step 5 - Review and create:
-   - Confirm configuration is correct, click **Create rule**
+   - Click **Save**
 
-> 💡 **About Lambda trigger permissions**: Console automatically prompts to add Lambda resource-based policy when creating EventBridge rules. If using CLI, you must manually run `aws lambda add-permission` command.
+> 💡 **Note**: The old Console used a multi-step wizard, the new Console uses a single-page form + edit approach. Both create identical rules.
 
 **CLI Method:**
 
@@ -1023,38 +1023,35 @@ aws lambda add-permission \
 
 ### 6.2 Scheduled Polling Rule
 
-> 💡 **Note**: When creating a rule, AWS Console may show a hint to use the "Scheduler" builder. You can ignore this - EventBridge Rules with schedule expressions still work and are what CDK deploys.
-
 **Console Method:**
 
-1. Go to AWS Console → EventBridge → Rules
-2. Click **Create rule**
-3. Step 1 - Define rule detail:
-   - Name: `LarkCaseBot-Poller`
-   - Description: `Poll AWS Support case status every 10 minutes`
-   - Event bus: **default**
-   - Rule type: **Schedule**
-   - Click **Continue in EventBridge Scheduler** if prompted, or **Continue to create rule** to stay with Rules
+1. Go to AWS Console → Amazon EventBridge → Rules (ensure you're in **us-east-1** region)
+2. At the top of the page, click the **scheduled rule builder** link
+3. **Step 1 - Define rule detail**:
+   - **Name**: `LarkCaseBot-Poller`
+   - **Description**: `Poll AWS Support case status every 5 minutes` (optional)
+   - **Event bus**: Keep `default`
+   - Check **Enable the rule on the selected event bus**
    - Click **Next**
-4. Step 2 - Define schedule:
-   - Schedule pattern: **A schedule that runs at a regular rate**
-   - Rate expression: `10` **minutes**
+4. **Step 2 - Define schedule**:
+   - Select **A schedule that runs at a regular rate, such as every 10 minutes**
+   - Rate expression: `5` **minutes**
    - Click **Next**
-5. Step 3 - Select target(s):
+5. **Step 3 - Select target(s)**:
    - Target types: **AWS service**
    - Select a target: **Lambda function**
    - Function: `LarkCaseBot-CasePoller`
-   - ⚠️ If prompted to add permissions, click **Allow**
    - Click **Next**
-6. Complete creation
+6. **Step 4 - Configure tags**: Skip, click **Next**
+7. **Step 5 - Review and create**: Review configuration, click **Create rule**
 
 **CLI Method:**
 
 ```bash
-# Create rule (every 10 minutes, consistent with CDK default)
+# Create rule (every 5 minutes)
 aws events put-rule \
   --name LarkCaseBot-Poller \
-  --schedule-expression "rate(10 minutes)" \
+  --schedule-expression "rate(5 minutes)" \
   --region us-east-1
 
 # Add target
@@ -1077,26 +1074,25 @@ aws lambda add-permission \
 
 **Console Method:**
 
-1. Go to AWS Console → EventBridge → Rules
-2. Click **Create rule**
-3. Step 1 - Define rule detail:
-   - Name: `LarkCaseBot-GroupCleanup`
-   - Description: `Auto-dissolve resolved case groups every hour`
-   - Event bus: **default**
-   - Rule type: **Schedule**
-   - Click **Continue to create rule** if prompted about Scheduler
+1. Go to AWS Console → Amazon EventBridge → Rules (ensure you're in **us-east-1** region)
+2. At the top of the page, click the **scheduled rule builder** link
+3. **Step 1 - Define rule detail**:
+   - **Name**: `LarkCaseBot-GroupCleanup`
+   - **Description**: `Auto-dissolve resolved case groups every hour` (optional)
+   - **Event bus**: Keep `default`
+   - Check **Enable the rule on the selected event bus**
    - Click **Next**
-4. Step 2 - Define schedule:
-   - Schedule pattern: **A schedule that runs at a regular rate**
-   - Rate expression: `1` **hour**
+4. **Step 2 - Define schedule**:
+   - Select **A schedule that runs at a regular rate, such as every 10 minutes**
+   - Rate expression: `1` **hours**
    - Click **Next**
-5. Step 3 - Select target(s):
+5. **Step 3 - Select target(s)**:
    - Target types: **AWS service**
    - Select a target: **Lambda function**
    - Function: `LarkCaseBot-GroupCleanup`
-   - ⚠️ If prompted to add permissions, click **Allow**
    - Click **Next**
-6. Complete creation
+6. **Step 4 - Configure tags**: Skip, click **Next**
+7. **Step 5 - Review and create**: Review configuration, click **Create rule**
 
 **CLI Method:**
 
@@ -1123,75 +1119,206 @@ aws lambda add-permission \
   --source-arn arn:aws:events:us-east-1:${ACCOUNT_ID}:rule/LarkCaseBot-GroupCleanup
 ```
 
-### 6.4 Cross-Account EventBridge Configuration (Required for Multi-Account)
+# Add Lambda permission
+aws lambda add-permission \
+  --function-name LarkCaseBot-GroupCleanup \
+  --statement-id eventbridge-schedule \
+  --action lambda:InvokeFunction \
+  --principal events.amazonaws.com \
+  --source-arn arn:aws:events:us-east-1:${ACCOUNT_ID}:rule/LarkCaseBot-GroupCleanup
+```
 
-> ⚠️ **Important**: If you need to support multiple AWS accounts, you must configure cross-account EventBridge forwarding, otherwise case updates from other accounts won't be pushed to Lark.
+---
 
-#### 6.4.1 Create Custom Event Bus in Main Account
+### Multi-Account Configuration Notes
+
+> 📋 **Applicable Scenarios**:
+> | Deployment Scenario | 6.4 Support API Role | 6.5 Cross-Account EventBridge |
+> |---------------------|---------------------|-------------------------------|
+> | Single Account | ❌ Skip | ❌ Skip |
+> | Multi-Account | ✅ **Required** - Otherwise cannot manage cases in other accounts | ⚡ **Optional** - Enables real-time push (without it, polls every 5 min) |
+>
+> 💡 **Single Account Users**: Skip to [Step 7: Initialize Configuration](#step-7-initialize-configuration)
+
+---
+
+### 6.4 Create Support API Role in Other Accounts (Required for Multi-Account)
+
+> ⚠️ **Required for Multi-Account**: This role allows main account's Lambda to call Support API in other accounts for creating and managing cases.
+>
+> 💡 **Note**: This role ARN will be used in [Step 7.1 S3 Configuration](#71-initialize-s3-configuration).
+
+Execute the following steps in **each other account that needs support**:
+
+**Console Method:**
+
+1. Log in to **other account's** AWS Console
+2. Go to IAM → Roles → **Create role**
+3. Step 1 - Select trusted entity:
+   - Trusted entity type: **Custom trust policy**
+   - Paste the following trust policy (replace `MAIN_ACCOUNT_ID` with main account ID):
+     ```json
+     {
+       "Version": "2012-10-17",
+       "Statement": [
+         {
+           "Effect": "Allow",
+           "Principal": {
+             "AWS": [
+               "arn:aws:iam::MAIN_ACCOUNT_ID:role/LarkCaseBot-MsgEventRole",
+               "arn:aws:iam::MAIN_ACCOUNT_ID:role/LarkCaseBot-CasePollerRole"
+             ]
+           },
+           "Action": "sts:AssumeRole"
+         }
+       ]
+     }
+     ```
+   - Click **Next**
+4. Step 2 - Add permissions:
+   - Search and select `AWSSupportAccess`
+   - Click **Next**
+5. Step 3 - Name, review, and create:
+   - Role name: `LarkCaseBot-SupportApiRole`
+   - Description: `Lark bot cross-account support access`
+   - Click **Create role**
+
+**CLI Method:**
 
 ```bash
 # Set variables
-MAIN_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+MAIN_ACCOUNT_ID="111122223333"  # Replace with main account ID
 
-# Create custom Event Bus
-aws events create-event-bus \
-  --name LarkCaseBot-case-event-bus \
-  --region us-east-1
+# Create trust policy
+cat > /tmp/support-trust.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+          "arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-MsgEventRole",
+          "arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-CasePollerRole"
+        ]
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
 
-# Allow other accounts to send events to this Bus
-# 💡 --principal "*" allows any account to send events. For stricter control, use specific account IDs like --principal "111122223333"
-# Or use put-permission multiple times to add multiple accounts
-aws events put-permission \
-  --event-bus-name LarkCaseBot-case-event-bus \
-  --action events:PutEvents \
-  --principal "*" \
-  --statement-id AllowCrossAccountPutEvents \
-  --region us-east-1
+# Create role
+aws iam create-role \
+  --role-name LarkCaseBot-SupportApiRole \
+  --assume-role-policy-document file:///tmp/support-trust.json \
+  --description "Lark bot cross-account support access"
+
+# Attach AWSSupportAccess policy
+aws iam attach-role-policy \
+  --role-name LarkCaseBot-SupportApiRole \
+  --policy-arn arn:aws:iam::aws:policy/AWSSupportAccess
+
+# Cleanup
+rm /tmp/support-trust.json
+
+echo "✅ Support API role creation complete"
 ```
 
-#### 6.4.2 Create Main Account Event Bus Rule
+---
 
-```bash
-# Create rule on custom Event Bus to forward to CaseUpdate Lambda
-aws events put-rule \
-  --name LarkCaseBot-CrossAccountCaseUpdate \
-  --event-bus-name LarkCaseBot-case-event-bus \
-  --event-pattern '{"source":["aws.support"],"detail-type":["Support Case Update"]}' \
-  --region us-east-1
+### 6.5 Cross-Account EventBridge Configuration (Optional for Multi-Account)
 
-# Add Lambda target
-aws events put-targets \
-  --rule LarkCaseBot-CrossAccountCaseUpdate \
-  --event-bus-name LarkCaseBot-case-event-bus \
-  --targets "Id"="1","Arn"="arn:aws:lambda:us-east-1:${MAIN_ACCOUNT_ID}:function:LarkCaseBot-CaseUpdate" \
-  --region us-east-1
+> ⚡ **Optional for Multi-Account**: Configure cross-account EventBridge forwarding so case updates from other accounts can be pushed to Lark in **real-time**.
+>
+> 💡 **Without this**: CasePoller will still poll all accounts every 5 minutes for updates - functionality works but with delay.
 
-# Add Lambda permission
-aws lambda add-permission \
-  --function-name LarkCaseBot-CaseUpdate \
-  --statement-id eventbridge-crossaccount \
-  --action lambda:InvokeFunction \
-  --principal events.amazonaws.com \
-  --source-arn "arn:aws:events:us-east-1:${MAIN_ACCOUNT_ID}:rule/LarkCaseBot-case-event-bus/LarkCaseBot-CrossAccountCaseUpdate"
-```
+#### 6.5.1 Configure Event Forwarding in Other Accounts
 
-#### 6.4.3 Configure Event Forwarding in Other Accounts
+> Execute the following steps in **each other account that needs support**:
+>
+> ⚠️ **Important**: Must operate in **us-east-1** region! AWS Support events are only generated in us-east-1.
 
-> Execute the following commands in **each other account that needs support**:
+**Console Method:**
+
+**Step A: Create IAM Role**
+
+1. Go to AWS Console → IAM → Roles → **Create role**
+2. Step 1 - Select trusted entity:
+   - Trusted entity type: **Custom trust policy**
+   - Paste the following trust policy:
+     ```json
+     {
+       "Version": "2012-10-17",
+       "Statement": [
+         {
+           "Effect": "Allow",
+           "Principal": {"Service": "events.amazonaws.com"},
+           "Action": "sts:AssumeRole"
+         }
+       ]
+     }
+     ```
+   - Click **Next**
+3. Step 2 - Add permissions: Click **Next** (add inline policy later)
+4. Step 3 - Name, review, and create:
+   - Role name: `LarkCaseBot-EventBridgeRole`
+   - Click **Create role**
+5. Find the role just created, click to enter
+6. In Permissions tab, click **Add permissions** → **Create inline policy**
+7. Select **JSON** tab, paste (replace `MAIN_ACCOUNT_ID` with main account ID):
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": "events:PutEvents",
+         "Resource": "arn:aws:events:us-east-1:MAIN_ACCOUNT_ID:event-bus/default"
+       }
+     ]
+   }
+   ```
+8. Click **Next**
+9. Policy name: `ForwardToMainAccount`
+10. Click **Create policy**
+
+**Step B: Create EventBridge Rule**
+
+1. Go to Amazon EventBridge → Rules
+2. Ensure Event bus is set to `default`
+3. Click **Create rule**
+4. On the main page, configure:
+
+   **Event pattern section:**
+   - Event source: **AWS events or EventBridge partner events**
+   - Creation method: **Use pattern form**
+   - Event source: **AWS services**
+   - AWS service: **Support**
+   - Event type: **Support Case Update**
+
+   **Target section:**
+   - Target type: **EventBridge event bus**
+   - Target: **Event bus in a different account or Region**
+   - Event bus as target: `arn:aws:events:us-east-1:MAIN_ACCOUNT_ID:event-bus/default` (replace MAIN_ACCOUNT_ID)
+   - Execution role: **Use existing role** → `LarkCaseBot-EventBridgeRole`
+
+5. Click **Create** button, a Configuration dialog appears
+6. In the dialog, fill in:
+   - **Rule name**: `LarkCaseBot-ForwardSupportEvents`
+   - **Description**: `Forward Support case updates to main account` (optional)
+   - **Event bus name**: Keep `default`
+   - **Activation**: Keep **Active** checked
+7. Click **Create** to confirm
+
+**CLI Method:**
 
 ```bash
 # Set variables (replace with actual values)
 MAIN_ACCOUNT_ID="111122223333"  # Main account ID
 THIS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-# 1. Create EventBridge forwarding rule
-aws events put-rule \
-  --name LarkCaseBot-ForwardSupportEvents \
-  --event-pattern '{"source":["aws.support"],"detail-type":["Support Case Update"]}' \
-  --state ENABLED \
-  --region us-east-1
-
-# 2. Create EventBridge IAM role
+# 1. Create EventBridge IAM role
 cat > /tmp/eventbridge-trust.json <<EOF
 {
   "Version": "2012-10-17",
@@ -1209,7 +1336,7 @@ aws iam create-role \
   --role-name LarkCaseBot-EventBridgeRole \
   --assume-role-policy-document file:///tmp/eventbridge-trust.json
 
-# 3. Add forwarding permission policy
+# 2. Add forwarding permission policy
 cat > /tmp/eventbridge-policy.json <<EOF
 {
   "Version": "2012-10-17",
@@ -1217,7 +1344,7 @@ cat > /tmp/eventbridge-policy.json <<EOF
     {
       "Effect": "Allow",
       "Action": "events:PutEvents",
-      "Resource": "arn:aws:events:us-east-1:${MAIN_ACCOUNT_ID}:event-bus/LarkCaseBot-case-event-bus"
+      "Resource": "arn:aws:events:us-east-1:${MAIN_ACCOUNT_ID}:event-bus/default"
     }
   ]
 }
@@ -1228,15 +1355,22 @@ aws iam put-role-policy \
   --policy-name ForwardToMainAccount \
   --policy-document file:///tmp/eventbridge-policy.json
 
-# 4. Wait for role to take effect
+# 3. Wait for role to take effect
 sleep 10
+
+# 4. Create EventBridge forwarding rule
+aws events put-rule \
+  --name LarkCaseBot-ForwardSupportEvents \
+  --event-pattern '{"source":["aws.support"],"detail-type":["Support Case Update"]}' \
+  --state ENABLED \
+  --region us-east-1
 
 # 5. Add forwarding target
 aws events put-targets \
   --rule LarkCaseBot-ForwardSupportEvents \
   --targets "[{
     \"Id\": \"1\",
-    \"Arn\": \"arn:aws:events:us-east-1:${MAIN_ACCOUNT_ID}:event-bus/LarkCaseBot-case-event-bus\",
+    \"Arn\": \"arn:aws:events:us-east-1:${MAIN_ACCOUNT_ID}:event-bus/default\",
     \"RoleArn\": \"arn:aws:iam::${THIS_ACCOUNT_ID}:role/LarkCaseBot-EventBridgeRole\"
   }]" \
   --region us-east-1
@@ -1247,7 +1381,67 @@ rm /tmp/eventbridge-trust.json /tmp/eventbridge-policy.json
 echo "✅ EventBridge forwarding configuration complete"
 ```
 
-#### 6.4.4 Verify Cross-Account Configuration
+#### 6.5.2 Configure default Event Bus Permissions in Main Account
+
+> ⚠️ **Note**: This step must be executed **after** creating the `LarkCaseBot-EventBridgeRole` role in other accounts (6.5.1 Step A), because the role referenced in the policy must already exist.
+
+**Console Method:**
+
+1. Go to AWS Console → Amazon EventBridge → Event buses
+2. Click **default** event bus
+3. Click **Permissions** tab
+4. In the Resource-based policy section, click **Manage permissions**
+5. On the Edit event bus page, paste the following policy in the **Resource-based policy** text box (replace `OTHER_ACCOUNT_ID` and `MAIN_ACCOUNT_ID` with actual account IDs):
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Sid": "AllowCrossAccountPutEvents",
+         "Effect": "Allow",
+         "Principal": {
+           "AWS": [
+             "arn:aws:iam::OTHER_ACCOUNT_ID:role/LarkCaseBot-EventBridgeRole"
+           ]
+         },
+         "Action": "events:PutEvents",
+         "Resource": "arn:aws:events:us-east-1:MAIN_ACCOUNT_ID:event-bus/default"
+       }
+     ]
+   }
+   ```
+   > 💡 For multiple accounts, add multiple role ARNs to the Principal.AWS array.
+6. Click **Update**
+
+**CLI Method:**
+
+```bash
+# Set variables
+MAIN_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+OTHER_ACCOUNT_ID="111122223333"  # Replace with other account ID
+
+# Allow other account's EventBridge role to send events to default bus
+aws events put-permission \
+  --event-bus-name default \
+  --action events:PutEvents \
+  --principal "arn:aws:iam::${OTHER_ACCOUNT_ID}:role/LarkCaseBot-EventBridgeRole" \
+  --statement-id "AllowAccount${OTHER_ACCOUNT_ID}" \
+  --region us-east-1
+```
+
+> 💡 To add multiple accounts, repeat the `put-permission` command with different `statement-id` each time.
+
+#### 6.5.3 Verify Cross-Account Configuration
+
+**Console Method:**
+
+1. In other account:
+   - EventBridge → Rules → Confirm `LarkCaseBot-ForwardSupportEvents` status is Enabled
+   - Click rule to view Targets, confirm target is main account's default Event Bus
+2. In main account:
+   - EventBridge → Rules (default bus) → Confirm `LarkCaseBot-CaseUpdate` exists and targets Lambda
+
+**CLI Method:**
 
 ```bash
 # Check rule in other account
@@ -1270,6 +1464,8 @@ aws iam get-role --role-name LarkCaseBot-EventBridgeRole
 
 ### 7.1 Initialize S3 Configuration
 
+> 💡 **Multi-Account Users**: To support multiple accounts, first complete [6.4 Create Support API Role](#64-create-support-api-role-in-other-accounts-required-for-multi-account), then add other accounts' `role_arn` in the configuration below.
+
 Create configuration file `config/LarkBotProfile-0.json` in the S3 bucket:
 
 ```json
@@ -1281,8 +1477,7 @@ Create configuration file `config/LarkBotProfile-0.json` in the S3 bucket:
       "account_name": "Main Account"
     }
   },
-  "user_whitelist": {},
-  "help_text": "Send 'create case' to create a new case\nSend 'history' to view case history"
+  "user_whitelist": {}
 }
 ```
 
@@ -1302,8 +1497,7 @@ cat > /tmp/config.json <<EOF
       "account_name": "Main Account"
     }
   },
-  "user_whitelist": {},
-  "help_text": "Send 'create case' to create a new case\nSend 'history' to view case history"
+  "user_whitelist": {}
 }
 EOF
 
