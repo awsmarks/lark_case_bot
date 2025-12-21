@@ -2180,6 +2180,11 @@ def handle_file_upload(case_info: Dict[str, Any], message: Dict[str, Any], user_
         file_data = download_file_from_lark(message_id, file_key)
         print(f"Step 1: Download completed, size: {len(file_data)} bytes")
         
+        # Check for empty file
+        if len(file_data) == 0:
+            send_message(case_info['case_chat_id'], 'text', {'text': '❌ 文件为空，无法上传 / File is empty'})
+            return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
+        
         # Get role_arn from case info (saved when case was created)
         role_arn = case_info.get('role_arn')
         
