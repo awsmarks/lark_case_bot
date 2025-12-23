@@ -586,7 +586,8 @@ aws iam put-role-policy \
       "Principal": {
         "AWS": [
           "arn:aws:iam::ACCOUNT_ID:role/LarkCaseBot-MsgEventRole",
-          "arn:aws:iam::ACCOUNT_ID:role/LarkCaseBot-CasePollerRole"
+          "arn:aws:iam::ACCOUNT_ID:role/LarkCaseBot-CasePollerRole",
+          "arn:aws:iam::ACCOUNT_ID:role/LarkCaseBot-CaseUpdateRole"
         ]
       },
       "Action": "sts:AssumeRole"
@@ -614,7 +615,8 @@ cat > /tmp/trust-policy.json <<EOF
       "Principal": {
         "AWS": [
           "arn:aws:iam::${ACCOUNT_ID}:role/LarkCaseBot-MsgEventRole",
-          "arn:aws:iam::${ACCOUNT_ID}:role/LarkCaseBot-CasePollerRole"
+          "arn:aws:iam::${ACCOUNT_ID}:role/LarkCaseBot-CasePollerRole",
+          "arn:aws:iam::${ACCOUNT_ID}:role/LarkCaseBot-CaseUpdateRole"
         ]
       },
       "Action": "sts:AssumeRole"
