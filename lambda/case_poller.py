@@ -223,8 +223,8 @@ def check_case_updates():
                 submitted_by = comm.get('submittedBy', '')
                 
                 # Truncate long messages
-                if len(body) > 1000:
-                    body = body[:1000] + '...\n\n' + get_message(DEFAULT_LANGUAGE, 'poller_message_truncated')
+                if len(body) > 8000:
+                    body = body[:8000] + '...\n\n' + get_message(DEFAULT_LANGUAGE, 'poller_message_truncated')
                 
                 # Different emoji for AWS Support vs customer
                 if 'Amazon Web Services' in submitted_by:
