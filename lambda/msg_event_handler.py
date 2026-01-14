@@ -1356,6 +1356,9 @@ def add_user_to_chat(chat_id: str, user_id: str) -> dict:
 
 def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
     """Handle message receive event"""
+    import time
+    t_start = time.time()
+    
     message = event_data.get('message', {})
     sender = event_data.get('sender', {})
     chat_id = message.get('chat_id', '')
@@ -1382,15 +1385,19 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
         print(f"  Non-text message content preview: {content_preview}")
     
     # Check whitelist
+    t0 = time.time()
     if not check_user_whitelist(user_id):
         no_permission_msg = get_message(DEFAULT_LANGUAGE, 'no_permission')
         send_message(chat_id, 'text', {'text': no_permission_msg}, reply_to_message_id=message_id)
         return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
+    print(f"[TIMING] check_user_whitelist: {(time.time()-t0)*1000:.0f}ms")
     
     # Check if this is a case chat message (query once, reuse later)
+    t0 = time.time()
     print(f"Checking if chat_id {chat_id} is a case chat")
     case_info = get_case_by_case_chat_id(chat_id)
     is_case_chat = case_info is not None
+    print(f"[TIMING] get_case_by_case_chat_id: {(time.time()-t0)*1000:.0f}ms")
     print(f"is_case_chat: {is_case_chat}")
     
     # File message: don't upload by default, only prompt user how to upload
@@ -1478,14 +1485,19 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
     # Check for create case command
     matched, cmd_lang, subject = match_command(text, 'create_case')
     if matched:
+        import time
+        t_cmd_start = time.time()
+        
         if not subject:
             error_msg = get_message(DEFAULT_LANGUAGE, 'enter_title')
             send_message(chat_id, 'text', {'text': error_msg}, reply_to_message_id=message_id)
             return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
         
         # Get configured account list
+        t0 = time.time()
         config = get_bot_config()
         accounts = config.get('accounts', {})
+        print(f"[TIMING] get_bot_config: {(time.time()-t0)*1000:.0f}ms")
         
         if not accounts:
             send_message(chat_id, 'text', {'text': get_message(DEFAULT_LANGUAGE, 'no_accounts_configured')}, reply_to_message_id=message_id)
@@ -1495,7 +1507,10 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
         draft_id = f"draft_{user_id}_{chat_id}_{int(datetime.now().timestamp())}"
         
         # First delete old drafts from this user in current chat (avoid multiple draft conflicts)
-        old_drafts = s3_get_cases_by_user(user_id, limit=50)
+        t0 = time.time()
+        old_drafts = s3_get_cases_by_user(user_id, limit=5)
+        print(f"[TIMING] s3_get_cases_by_user: {(time.time()-t0)*1000:.0f}ms")
+        
         old_message_ids = []
         for item in old_drafts:
             if item.get('status') == 'draft' and item.get('chat_id') == chat_id:
@@ -1505,6 +1520,7 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
                 delete_case(item['case_id'])
         
         # Create new draft
+        t0 = time.time()
         put_case(draft_id, {
             'case_id': draft_id,
             'user_id': user_id,
@@ -1514,6 +1530,7 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
             'issue_type': 'technical',
             'created_at': datetime.now().isoformat()
         })
+        print(f"[TIMING] put_case (draft): {(time.time()-t0)*1000:.0f}ms")
         
         # Recall old cards (if any)
         for msg_id in old_message_ids:
@@ -1524,22 +1541,27 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
                 print(f"Failed to recall old card {msg_id}: {e}")
         
         # Get creator name for display on card
+        t0 = time.time()
         creator_name = ""
         try:
             user_info = get_user_info(user_id=user_id, open_id=open_id)
             creator_name = user_info.get('name', '')
         except Exception as e:
             print(f"Failed to get user info: {e}")
+        print(f"[TIMING] get_user_info: {(time.time()-t0)*1000:.0f}ms")
         
         # Send case card, display case title (use global default language)
+        t0 = time.time()
         card = create_case_card(accounts, subject, lang=DEFAULT_LANGUAGE, creator_name=creator_name, creator_id=user_id)
         result = send_card(chat_id, card)
+        print(f"[TIMING] send_card: {(time.time()-t0)*1000:.0f}ms")
         
         # Save new card message_id to draft
         if result.get('data', {}).get('message_id'):
             new_message_id = result['data']['message_id']
             update_case(draft_id, {'card_message_id': new_message_id})
         
+        print(f"[TIMING] create_case total: {(time.time()-t_cmd_start)*1000:.0f}ms")
         return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
     
     elif text.startswith('follow') or text.startswith(MESSAGES['zh']['follow']):
