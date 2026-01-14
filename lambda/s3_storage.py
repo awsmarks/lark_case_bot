@@ -13,6 +13,7 @@ Note: S3 versioning is enabled for data protection and optimistic locking.
 """
 import json
 import os
+import time
 import boto3
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
@@ -24,49 +25,72 @@ s3_client = boto3.client('s3')
 # Environment variable
 DATA_BUCKET = os.environ.get('DATA_BUCKET', '')
 
+# Enable/disable S3 timing logs (set to False in production)
+ENABLE_S3_TIMING = True
+
 # Prefixes
 CONFIG_PREFIX = 'config/'
 CASES_PREFIX = 'cases/'
 CHAT_INDEX_PREFIX = 'indexes/chat_id/'
+CASE_CHAT_INDEX_PREFIX = 'indexes/case_chat_id/'  # Separate index for case group chats
 USER_INDEX_PREFIX = 'indexes/user_id/'
 
 
 def _get_object(key: str) -> Optional[Dict[str, Any]]:
     """Get JSON object from S3"""
+    t0 = time.time() if ENABLE_S3_TIMING else None
     try:
         response = s3_client.get_object(Bucket=DATA_BUCKET, Key=key)
-        return json.loads(response['Body'].read().decode('utf-8'))
+        data = json.loads(response['Body'].read().decode('utf-8'))
+        if ENABLE_S3_TIMING:
+            print(f"[S3] GET {key}: {(time.time()-t0)*1000:.0f}ms")
+        return data
     except ClientError as e:
         if e.response['Error']['Code'] == 'NoSuchKey':
+            if ENABLE_S3_TIMING:
+                print(f"[S3] GET {key}: NOT FOUND ({(time.time()-t0)*1000:.0f}ms)")
             return None
+        if ENABLE_S3_TIMING:
+            print(f"[S3] GET {key}: ERROR {e} ({(time.time()-t0)*1000:.0f}ms)")
         raise
 
 
 def _put_object(key: str, data: Dict[str, Any]):
     """Put JSON object to S3"""
+    t0 = time.time() if ENABLE_S3_TIMING else None
     s3_client.put_object(
         Bucket=DATA_BUCKET,
         Key=key,
         Body=json.dumps(data, default=str).encode('utf-8'),
         ContentType='application/json'
     )
+    if ENABLE_S3_TIMING:
+        print(f"[S3] PUT {key}: {(time.time()-t0)*1000:.0f}ms")
 
 
 def _delete_object(key: str):
     """Delete object from S3"""
+    t0 = time.time() if ENABLE_S3_TIMING else None
     try:
         s3_client.delete_object(Bucket=DATA_BUCKET, Key=key)
-    except ClientError:
+        if ENABLE_S3_TIMING:
+            print(f"[S3] DELETE {key}: {(time.time()-t0)*1000:.0f}ms")
+    except ClientError as e:
+        if ENABLE_S3_TIMING:
+            print(f"[S3] DELETE {key}: ERROR {e} ({(time.time()-t0)*1000:.0f}ms)")
         pass  # Ignore if doesn't exist
 
 
 def _list_objects(prefix: str) -> List[str]:
     """List object keys with given prefix"""
+    t0 = time.time() if ENABLE_S3_TIMING else None
     keys = []
     paginator = s3_client.get_paginator('list_objects_v2')
     for page in paginator.paginate(Bucket=DATA_BUCKET, Prefix=prefix):
         for obj in page.get('Contents', []):
             keys.append(obj['Key'])
+    if ENABLE_S3_TIMING:
+        print(f"[S3] LIST {prefix}: {len(keys)} objects ({(time.time()-t0)*1000:.0f}ms)")
     return keys
 
 
@@ -105,15 +129,16 @@ def put_case(case_id: str, case_data: Dict[str, Any]):
     key = f"{CASES_PREFIX}{case_id}.json"
     _put_object(key, case_data)
     
-    # Update chat_id index if present
+    # Update chat_id index if present (source chat where command was issued)
     chat_id = case_data.get('chat_id')
     if chat_id:
         _update_chat_index(chat_id, case_id)
     
-    # Update case_chat_id index if present (for case group chats)
+    # Update case_chat_id index if present (dedicated case group chat)
+    # Use SEPARATE index to avoid confusion with source chat
     case_chat_id = case_data.get('case_chat_id')
     if case_chat_id:
-        _update_chat_index(case_chat_id, case_id)
+        _update_case_chat_index(case_chat_id, case_id)
     
     # Update user_id index if present
     user_id = case_data.get('user_id')
@@ -137,14 +162,15 @@ def delete_case(case_id: str):
     """Delete case and remove from indexes"""
     case_data = get_case(case_id)
     if case_data:
-        # Remove from chat_id index
+        # Remove from chat_id index (source chat)
         chat_id = case_data.get('chat_id')
         if chat_id:
             _remove_from_chat_index(chat_id, case_id)
         
+        # Remove from case_chat_id index (case group chat)
         case_chat_id = case_data.get('case_chat_id')
         if case_chat_id:
-            _remove_from_chat_index(case_chat_id, case_id)
+            _remove_from_case_chat_index(case_chat_id, case_id)
         
         # Remove from user_id index
         user_id = case_data.get('user_id')
@@ -161,9 +187,19 @@ def delete_case(case_id: str):
 # ============================================================================
 
 def _update_chat_index(chat_id: str, case_id: str):
-    """Update chat_id -> case_id index"""
+    """Update chat_id -> case_id index (for source chats)"""
     key = f"{CHAT_INDEX_PREFIX}{chat_id}.json"
     index_data = _get_object(key) or {'chat_id': chat_id, 'case_ids': []}
+    
+    if case_id not in index_data['case_ids']:
+        index_data['case_ids'].append(case_id)
+        _put_object(key, index_data)
+
+
+def _update_case_chat_index(case_chat_id: str, case_id: str):
+    """Update case_chat_id -> case_id index (for dedicated case group chats)"""
+    key = f"{CASE_CHAT_INDEX_PREFIX}{case_chat_id}.json"
+    index_data = _get_object(key) or {'case_chat_id': case_chat_id, 'case_ids': []}
     
     if case_id not in index_data['case_ids']:
         index_data['case_ids'].append(case_id)
@@ -173,6 +209,18 @@ def _update_chat_index(chat_id: str, case_id: str):
 def _remove_from_chat_index(chat_id: str, case_id: str):
     """Remove case_id from chat_id index"""
     key = f"{CHAT_INDEX_PREFIX}{chat_id}.json"
+    index_data = _get_object(key)
+    if index_data and case_id in index_data.get('case_ids', []):
+        index_data['case_ids'].remove(case_id)
+        if index_data['case_ids']:
+            _put_object(key, index_data)
+        else:
+            _delete_object(key)
+
+
+def _remove_from_case_chat_index(case_chat_id: str, case_id: str):
+    """Remove case_id from case_chat_id index"""
+    key = f"{CASE_CHAT_INDEX_PREFIX}{case_chat_id}.json"
     index_data = _get_object(key)
     if index_data and case_id in index_data.get('case_ids', []):
         index_data['case_ids'].remove(case_id)
@@ -299,12 +347,15 @@ def get_open_cases() -> List[Dict[str, Any]]:
 
 
 def get_case_by_case_chat_id(case_chat_id: str) -> Optional[Dict[str, Any]]:
-    """Get case by case_chat_id (case group chat only)
+    """Get case by case_chat_id using dedicated index (O(1) lookup)
     
-    This function only matches the case_chat_id field (the dedicated case group),
-    NOT the chat_id field (where the case was created from).
+    Uses CASE_CHAT_INDEX_PREFIX which is separate from CHAT_INDEX_PREFIX.
+    This prevents false positives where source chats are mistaken for case chats.
     """
-    # Only scan for case_chat_id match - do NOT use chat_id index
-    # because chat_id index contains both source chats and case chats
-    cases = scan_cases_by_filter(lambda c: c.get('case_chat_id') == case_chat_id)
-    return cases[0] if cases else None
+    key = f"{CASE_CHAT_INDEX_PREFIX}{case_chat_id}.json"
+    index_data = _get_object(key)
+    
+    if index_data and index_data.get('case_ids'):
+        case_id = index_data['case_ids'][-1]
+        return get_case(case_id)
+    return None
