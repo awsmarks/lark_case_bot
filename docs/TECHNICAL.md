@@ -259,71 +259,9 @@ python setup_lark_bot.py verify --all
 
 ## Troubleshooting / 故障排查
 
-### 1. Attachment Upload Failures / 附件上传失败
+For the full troubleshooting guide, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
-**Error / 错误**: `❌ 附件处理失败: Failed to download file: HTTP 400`
-
-**Cause / 原因**: Bot lacks file download permission / Bot 缺少文件下载权限
-
-**Solution / 解决方案**:
-1. Go to Lark Open Platform / 前往Lark开放平台
-2. Add permissions / 添加权限:
-   - `im:message.file:readonly`
-   - `im:resource:readonly`
-3. Publish new version / 发布新版本
-4. Reinstall bot / 重新安装 Bot
-
----
-
-### 2. Case Resolved But No Notification / 工单解决但无通知
-
-**Cause / 原因**: Event field name mismatch / 事件字段名不匹配
-
-**Solution / 解决方案**: Already fixed in latest version / 最新版本已修复
-
-**Verify / 验证**:
-```bash
-# Check Lambda logs / 检查 Lambda 日志
-# CDK deployment:
-aws logs tail /aws/lambda/LarkCaseBotStack-CaseUpdateLambda* --follow
-# Manual deployment:
-aws logs tail /aws/lambda/LarkCaseBot-CaseUpdateLambda --follow
-
-# Look for / 查找:
-# "Processing event: event_type=ResolveCase"
-```
-
----
-
-### 3. Unexpected Attachment Errors / 意外的附件错误
-
-**Symptom / 症状**: Error when no file uploaded / 未上传文件却收到错误
-
-**Cause / 原因**: Message type misidentification / 消息类型误判
-
-**Solution / 解决方案**: Already fixed with strict validation / 已通过严格验证修复
-
----
-
-### 4. Time Display Issues / 时间显示问题
-
-**Question / 问题**: What timezone? / 什么时区？
-
-**Answer / 答案**: Both UTC and GMT+8 / UTC 和 GMT+8 双时区
-
-**Format / 格式**: `2025-11-25 10:30:00 UTC / 2025-11-25 18:30:00 GMT+8`
-
----
-
-### 5. Cross-Organization Issues / 跨组织问题
-
-**Symptom / 症状**: Some users can't see bot / 部分用户看不到 Bot
-
-**Cause / 原因**: Different Lark organizations / 不同Lark组织
-
-**Solution / 解决方案**:
-- Deploy separate bots / 部署独立 Bot
-- Use AWS Console / 使用 AWS Console
+完整的故障排查指南请参考 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)。
 
 ---
 
@@ -338,6 +276,7 @@ aws logs tail /aws/lambda/LarkCaseBot-CaseUpdateLambda --follow
 | Rich text / 富文本 | 100,000 characters / 100,000 字符 |
 | Card message / 卡片消息 | 30 KB |
 | File upload / 文件上传 | 30 MB |
+| Image upload / 图片上传 | 30 MB |
 | Message rate / 消息频率 | 20/min/user, 50/min/group |
 
 ### AWS Support Limits / AWS Support 限制
@@ -508,7 +447,7 @@ lambda/
 ### Data Storage / 数据存储
 
 - Case info: S3 (encrypted at rest)
-- Attachments: Lambda memory (temporary)
+- Attachments (files and images): Lambda memory (temporary)
 - Credentials: Secrets Manager (encrypted)
 
 ### Access Control / 访问控制
