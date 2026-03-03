@@ -1424,31 +1424,38 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
     print(f"[TIMING] get_case_by_case_chat_id: {(time.time()-t0)*1000:.0f}ms")
     print(f"is_case_chat: {is_case_chat}")
     
-    # File message: don't upload by default, only prompt user how to upload
-    if message_type == 'file':
-        print(f"Received file message, message_type: {message_type}")
-        
-        # Validate if this is really a file message (check required fields)
+    # File/image message: don't upload by default, only prompt user how to upload
+    if message_type in ('file', 'image'):
+        print(f"Received file/image message, message_type: {message_type}")
+
+        # Validate if this is really a file/image message (check required fields)
         content = json.loads(message.get('content', '{}'))
-        file_key = content.get('file_key', '')
-        file_name = content.get('file_name', 'attachment')
-        
-        print(f"File message validation: file_key={file_key}, message_id={message_id}")
-        
+        if message_type == 'image':
+            file_key = content.get('image_key', '')
+            import time as _time
+            file_name = f"image_{int(_time.time())}.png"
+        else:
+            file_key = content.get('file_key', '')
+            file_name = content.get('file_name', 'attachment')
+
+        print(f"File/image message validation: file_key={file_key}, message_id={message_id}")
+
         # If missing required fields, may be misidentified or special message, skip
         if not file_key or not message_id:
-            print(f"Invalid file message (missing file_key or message_id), skipping file upload handler")
+            print(f"Invalid file/image message (missing file_key/image_key or message_id), skipping upload handler")
             # Continue processing as normal message
         elif is_case_chat:
             # Don't auto-upload, prompt user to reply with "upload" to upload
-            # Note: Don't use reply_to_message_id here, so user knows to reply to the file message directly
-            print(f"File received in case chat, not auto-uploading. case_id: {case_info.get('case_id')}")
-            file_msg = f"{get_message(DEFAULT_LANGUAGE, 'file_received', file_name)}\n\n{get_message(DEFAULT_LANGUAGE, 'file_upload_hint')}"
+            print(f"File/image received in case chat, not auto-uploading. case_id: {case_info.get('case_id')}")
+            if message_type == 'image':
+                file_msg = f"{get_message(DEFAULT_LANGUAGE, 'image_received')}\n\n{get_message(DEFAULT_LANGUAGE, 'image_upload_hint')}"
+            else:
+                file_msg = f"{get_message(DEFAULT_LANGUAGE, 'file_received', file_name)}\n\n{get_message(DEFAULT_LANGUAGE, 'file_upload_hint')}"
             send_message(chat_id, 'text', {'text': file_msg})
             return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
         else:
-            # File upload in non-case chat, silently ignore
-            print(f"File received in non-case chat, ignoring silently")
+            # File/image upload in non-case chat, silently ignore
+            print(f"File/image received in non-case chat, ignoring silently")
             return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
     
     # Handle "upload" command (when replying to file message)
@@ -1462,16 +1469,21 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
             if mention_key:
                 cmd_text = cmd_text.replace(mention_key, '').strip()
         
-        # Handle "dissolve group" command
-        if cmd_text in ['dissolve', 'dissolve group']:
+        # Handle "dissolve group" command (supports all languages)
+        dissolve_cmds = [MESSAGES[lang].get('dissolve', '') for lang in MESSAGES] + \
+                        [MESSAGES[lang].get('dissolve_group', '') for lang in MESSAGES]
+        dissolve_cmds = [c.lower() for c in dissolve_cmds if c]
+        if cmd_text.lower() in dissolve_cmds:
             print(f"Dissolve group command detected, case_info: {case_info}")
             return handle_dissolve_group(case_info, chat_id, open_id)
-        
-        # Handle "upload" command (when replying to file message)
+
+        # Handle "upload" command (when replying to file/image message, supports all languages)
+        upload_cmds = [MESSAGES[lang].get('upload', '') for lang in MESSAGES]
+        upload_cmds = [c.lower() for c in upload_cmds if c]
         parent_id = message.get('parent_id', '')
         if parent_id:
             print(f"Upload command check: parent_id={parent_id}, cmd_text='{cmd_text}'")
-            if cmd_text in ['upload', '上传']:
+            if cmd_text.lower() in upload_cmds:
                 print(f"Upload command detected, parent_id: {parent_id}")
                 return handle_upload_reply(case_info, parent_id, chat_id, user_id)
     
@@ -1696,7 +1708,7 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
                     [{"tag": "text", "text": ""}],
                     [{"tag": "text", "text": "💬 "}, {"tag": "text", "text": "工单沟通", "style": ["bold"]}],
                     [{"tag": "text", "text": "• 在工单群中 "}, {"tag": "text", "text": "@bot [内容]", "style": ["bold"]}, {"tag": "text", "text": " 同步到 AWS Support"}],
-                    [{"tag": "text", "text": "• 上传的文件会自动同步"}],
+                    [{"tag": "text", "text": "• 上传文件/图片后，回复 "}, {"tag": "text", "text": "上传", "style": ["bold"]}, {"tag": "text", "text": " 同步到 AWS Support"}],
                     [{"tag": "text", "text": "• 普通消息仅保留在群内"}],
                     [{"tag": "text", "text": ""}],
                     [{"tag": "text", "text": "📋 "}, {"tag": "text", "text": "其他命令", "style": ["bold"]}],
@@ -1930,7 +1942,7 @@ def handle_case_chat_message(case_info: Dict[str, Any], message: Dict[str, Any],
                 [{"tag": "text", "text": ""}],
                 [{"tag": "text", "text": "💬 "}, {"tag": "text", "text": "同步到 AWS Support", "style": ["bold"]}],
                 [{"tag": "text", "text": "• "}, {"tag": "text", "text": "@bot [内容]", "style": ["bold"]}, {"tag": "text", "text": " - 将消息同步到 AWS Support"}],
-                [{"tag": "text", "text": "• "}, {"tag": "text", "text": "上传文件", "style": ["bold"]}, {"tag": "text", "text": " - 文件会自动同步"}],
+                [{"tag": "text", "text": "• 上传文件/图片后，回复 "}, {"tag": "text", "text": "上传", "style": ["bold"]}, {"tag": "text", "text": " 同步到 AWS Support"}],
                 [{"tag": "text", "text": ""}],
                 [{"tag": "text", "text": "💭 "}, {"tag": "text", "text": "群内讨论", "style": ["bold"]}],
                 [{"tag": "text", "text": "• 普通消息（不 @bot）仅在群内显示，不会同步到 AWS Support"}],
@@ -1950,7 +1962,7 @@ def handle_case_chat_message(case_info: Dict[str, Any], message: Dict[str, Any],
                 [{"tag": "text", "text": ""}],
                 [{"tag": "text", "text": "💬 "}, {"tag": "text", "text": "Sync to AWS Support", "style": ["bold"]}],
                 [{"tag": "text", "text": "• "}, {"tag": "text", "text": "@bot [content]", "style": ["bold"]}, {"tag": "text", "text": " - Sync message to AWS Support"}],
-                [{"tag": "text", "text": "• "}, {"tag": "text", "text": "Upload files", "style": ["bold"]}, {"tag": "text", "text": " - Files are auto-synced"}],
+                [{"tag": "text", "text": "• Send file/image, then reply with "}, {"tag": "text", "text": "upload", "style": ["bold"]}, {"tag": "text", "text": " to sync to AWS Support"}],
                 [{"tag": "text", "text": ""}],
                 [{"tag": "text", "text": "💭 "}, {"tag": "text", "text": "Internal Discussion", "style": ["bold"]}],
                 [{"tag": "text", "text": "• Regular messages (without @bot) stay in chat only, not synced to AWS Support"}],
@@ -2030,7 +2042,7 @@ def handle_case_chat_message(case_info: Dict[str, Any], message: Dict[str, Any],
     return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
 
 
-def download_file_from_lark(message_id: str, file_key: str) -> bytes:
+def download_file_from_lark(message_id: str, file_key: str, resource_type: str = 'file') -> bytes:
     """Download file from Lark using message_id and file_key"""
     try:
         token = get_tenant_access_token()
@@ -2043,7 +2055,7 @@ def download_file_from_lark(message_id: str, file_key: str) -> bytes:
         }
         
         # Add query parameter type, can be file, image, audio, video, media based on message type
-        params = "?type=file"
+        params = f"?type={resource_type}"
         full_url = url + params
         
         print(f"Downloading file from Lark")
@@ -2189,16 +2201,16 @@ def handle_upload_reply(case_info: Dict[str, Any], parent_id: str, chat_id: str,
         send_message(chat_id, 'text', {'text': get_message(DEFAULT_LANGUAGE, 'upload_get_msg_failed')})
         return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
     
-    # Check if it's a file message
+    # Check if it's a file or image message
     msg_type = parent_message.get('msg_type', '')
-    if msg_type != 'file':
+    if msg_type not in ('file', 'image'):
         send_message(chat_id, 'text', {'text': get_message(DEFAULT_LANGUAGE, 'upload_reply_to_file')})
         return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
-    
+
     # Construct message object and call handle_file_upload
     message = {
         'message_id': parent_id,
-        'message_type': 'file',
+        'message_type': msg_type,
         'content': parent_message.get('body', {}).get('content', '{}')
     }
     
@@ -2213,26 +2225,35 @@ def handle_file_upload(case_info: Dict[str, Any], message: Dict[str, Any], user_
         content = json.loads(content_str)
     else:
         content = content_str
-    file_key = content.get('file_key', '')
-    file_name = content.get('file_name', 'attachment')
     message_id = message.get('message_id', '')
     message_type = message.get('message_type', 'unknown')
-    
+
+    # Handle image vs file content fields
+    if message_type == 'image':
+        file_key = content.get('image_key', '')
+        import time as _time
+        file_name = f"image_{int(_time.time())}.png"
+        resource_type = 'image'
+    else:
+        file_key = content.get('file_key', '')
+        file_name = content.get('file_name', 'attachment')
+        resource_type = 'file'
+
     print(f"=== File Upload Handler ===")
     print(f"  message_id: {message_id}")
     print(f"  message_type: {message_type}")
     print(f"  file_key: {file_key}")
     print(f"  file_name: {file_name}")
     print(f"  case_id: {case_info.get('case_id')}")
-    
+
     if not file_key or not message_id:
         print(f"Missing required fields, skipping")
         return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
-    
+
     try:
-        # Download file
-        print(f"Step 1: Downloading file from Lark...")
-        file_data = download_file_from_lark(message_id, file_key)
+        # Download file/image
+        print(f"Step 1: Downloading {resource_type} from Lark...")
+        file_data = download_file_from_lark(message_id, file_key, resource_type=resource_type)
         print(f"Step 1: Download completed, size: {len(file_data)} bytes")
         
         # Check for empty file
