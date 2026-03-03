@@ -286,8 +286,8 @@ def format_aws_time_dual(aws_time_str: str) -> str:
 
 def is_lark_originated_message(body: str) -> bool:
     """Check if the message was originated from Lark"""
-    # Messages sent from Lark have this prefix pattern (Chinese: "[来自" means "[From")
-    return body.startswith('[来自') and 'via Lark]' in body
+    # Messages sent from Lark have format: [From {name} via Lark]
+    return '[From ' in body and 'via Lark]' in body
 
 
 def get_dual_timezone_time() -> str:
