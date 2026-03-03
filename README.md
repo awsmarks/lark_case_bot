@@ -48,10 +48,10 @@ This ensures **bidirectional sync** works automatically:
 - **Create Case**: `create case [title]` or `开工单 [标题]`
 - **View History**: `history` or `历史`
 - **Follow Case**: `follow [case ID]` or `关注 [工单ID]`
-- **Dissolve Group**: `dissolve` or `解散群` (creator only)
+- **Dissolve Group**: `dissolve` / `dissolve group` or `解散` / `解散群` (creator only)
 - **Auto-Dissolve**: Automatically dissolve case groups N hours after resolution (default: 72h)
 - **Bidirectional Sync**: Lark ↔ AWS Support real-time message sync
-- **File Upload**: Reply to a file in case group and type "upload" or "上传工单"
+- **File/Image Upload**: Send a file or image in case group, then reply with `upload` or `上传`
 
 ## Case Group Operations
 
@@ -59,8 +59,8 @@ This ensures **bidirectional sync** works automatically:
 |--------|-------------|
 | `@bot [message]` | Sync message to AWS Support |
 | Direct message | Internal team discussion (not synced) |
-| Reply to file + "upload" | Upload attachment to AWS |
-| `dissolve` | Dissolve case group (creator only) |
+| Reply to file/image + `upload` or `上传` | Upload attachment to AWS |
+| `dissolve` / `解散` | Dissolve case group (creator only) |
 
 ## Documentation
 
