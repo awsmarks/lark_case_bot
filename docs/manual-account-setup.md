@@ -92,7 +92,8 @@ echo "arn:aws:iam::${ACCOUNT_ID}:role/LarkCaseBot-CasePollerRole"
       "Principal": {
         "AWS": [
           "arn:aws:iam::<ACCOUNT_ID>:role/LarkCaseBot-MsgEventRole",
-          "arn:aws:iam::<ACCOUNT_ID>:role/LarkCaseBot-CasePollerRole"
+          "arn:aws:iam::<ACCOUNT_ID>:role/LarkCaseBot-CasePollerRole",
+          "arn:aws:iam::<ACCOUNT_ID>:role/LarkCaseBot-CaseUpdateRole"
         ]
       },
       "Action": "sts:AssumeRole"
@@ -175,7 +176,8 @@ cat > trust-policy.json <<EOF
       "Principal": {
         "AWS": [
           "arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-MsgEventRole",
-          "arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-CasePollerRole"
+          "arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-CasePollerRole",
+          "arn:aws:iam::${MAIN_ACCOUNT_ID}:role/LarkCaseBot-CaseUpdateRole"
         ]
       },
       "Action": "sts:AssumeRole"
