@@ -1516,11 +1516,14 @@ rm /tmp/config.json
 
 Refer to [LARK-SETUP.md](LARK-SETUP.md) to complete Lark app configuration:
 
-1. Create Lark app
+1. Create Lark app (must use **new version bot**)
 2. Configure permissions (18 permissions)
-3. Configure event subscription
-4. Set Webhook URL (URL obtained from Step 5)
-5. Publish app
+3. Configure event subscription (Event Configuration → Request URL)
+4. Configure card callback (Callback Configuration → Request URL, same URL as event config)
+5. Set Webhook URL (URL obtained from Step 5)
+6. Publish app
+
+> ⚠️ **Important**: Event Configuration and Callback Configuration must **both** be set with the same Webhook URL. If only event config is set without callback config, card interactions (dropdown selection, button clicks) will fail with error 200340. If callback config is greyed out, upgrade your bot to the new version first.
 
 ---
 
