@@ -1918,13 +1918,18 @@ def handle_case_chat_message(case_info: Dict[str, Any], message: Dict[str, Any],
     if not text:
         return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
     
-    # Check if @bot mentioned
+    # Check if THIS bot was @mentioned (not just any user @mention)
     mentions = message.get('mentions', [])
     has_bot_mention = False
+    bot_oid = get_bot_open_id()
     for mention in mentions:
         mention_key = mention.get('key', '')
-        if mention_key:
+        mention_open_id = mention.get('id', {}).get('open_id', '')
+        if mention_key and mention_open_id == bot_oid:
             has_bot_mention = True
+            text = text.replace(mention_key, '').strip()
+        elif mention_key:
+            # Other user @mentioned — remove the mention tag but don't set bot flag
             text = text.replace(mention_key, '').strip()
     
     print(f"Case chat message - has_bot_mention: {has_bot_mention}, text after removing mentions: '{text}'")
