@@ -340,9 +340,9 @@ def scan_cases_by_filter(filter_func) -> List[Dict[str, Any]]:
 
 
 def get_open_cases() -> List[Dict[str, Any]]:
-    """Get all cases that are not resolved"""
+    """Get all cases that are not resolved (excludes drafts and submitting)"""
     return scan_cases_by_filter(
-        lambda c: c.get('status', 'open') != 'resolved'
+        lambda c: c.get('status', 'open') not in ('resolved', 'draft', 'submitting')
     )
 
 
