@@ -1134,7 +1134,8 @@ def create_case_card(accounts: Dict[str, Dict[str, str]], subject: str = "", lan
         {'name': get_message(lang, 'card_severity_low'), 'code': 'low'},
         {'name': get_message(lang, 'card_severity_normal'), 'code': 'normal'},
         {'name': get_message(lang, 'card_severity_high'), 'code': 'high'},
-        {'name': get_message(lang, 'card_severity_urgent'), 'code': 'urgent'}
+        {'name': get_message(lang, 'card_severity_urgent'), 'code': 'urgent'},
+        {'name': get_message(lang, 'card_severity_critical'), 'code': 'critical'}
     ]
     
     # Build account options
@@ -1821,11 +1822,11 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
         
         # Severity mapping
         severity_map = {
-            'low': 'Low',
-            'normal': 'Normal',
-            'high': 'High',
-            'urgent': 'Urgent',
-            'critical': 'Critical'
+            'low': '⚪ General guidance' if not is_chinese else '⚪ 一般性指导',
+            'normal': '🟡 System impaired' if not is_chinese else '🟡 系统受损',
+            'high': '🟠 Production system impaired' if not is_chinese else '🟠 生产系统受损',
+            'urgent': '🔴 Production system down' if not is_chinese else '🔴 生产系统宕机',
+            'critical': '🔴 Business-critical system down' if not is_chinese else '🔴 业务关键系统宕机'
         }
         
         # Status mapping (all possible AWS Support statuses) - bilingual
