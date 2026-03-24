@@ -2378,11 +2378,13 @@ def process_case_submission_async(action_value: Dict[str, Any],
     if missing_fields:
         fields_str = "\n".join([f"• {field}" for field in missing_fields])
         send_message(chat_id, 'text', {'text': get_message(DEFAULT_LANGUAGE, 'fill_required_fields', fields_str)})
+        update_case(draft['case_id'], {'status': 'draft'})
         return
     
     # Skip separator
     if service_code == 'separator':
         send_message(chat_id, 'text', {'text': get_message(DEFAULT_LANGUAGE, 'select_valid_service')})
+        update_case(draft['case_id'], {'status': 'draft'})
         return
     
     # Get configuration
@@ -2395,6 +2397,7 @@ def process_case_submission_async(action_value: Dict[str, Any],
     
     if not account_key or account_key not in accounts:
         send_message(chat_id, 'text', {'text': get_message(DEFAULT_LANGUAGE, 'select_account')})
+        update_case(draft['case_id'], {'status': 'draft'})
         return
     
     account_config = accounts.get(account_key, {})
@@ -2403,6 +2406,7 @@ def process_case_submission_async(action_value: Dict[str, Any],
     
     if not role_arn:
         send_message(chat_id, 'text', {'text': get_message(DEFAULT_LANGUAGE, 'config_error')})
+        update_case(draft['case_id'], {'status': 'draft'})
         return
     
     # Create case directly with default description (localized)
