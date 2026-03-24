@@ -1553,7 +1553,7 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
         
         old_message_ids = []
         for item in old_drafts:
-            if item.get('status') == 'draft' and item.get('chat_id') == chat_id:
+            if item.get('status') in ('draft', 'submitting') and item.get('chat_id') == chat_id:
                 # Record old card message_id (if exists)
                 if item.get('card_message_id'):
                     old_message_ids.append(item['card_message_id'])
@@ -1785,7 +1785,7 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
             return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
         
         # Filter out drafts
-        cases = [c for c in cases if c.get('status') != 'draft']
+        cases = [c for c in cases if c.get('status') not in ('draft', 'submitting')]
         
         if not cases:
             send_message(chat_id, 'text', {'text': no_history_msg}, reply_to_message_id=message_id)
@@ -2348,7 +2348,7 @@ def process_case_submission_async(action_value: Dict[str, Any],
     
     # Get other info from draft (dropdown selected values)
     user_cases = s3_get_cases_by_user(user_id, limit=10)
-    drafts = [c for c in user_cases if c.get('status') == 'draft']
+    drafts = [c for c in user_cases if c.get('status') in ('draft', 'submitting')]
     
     if not drafts:
         # Use context_chat_id as fallback
@@ -2607,6 +2607,22 @@ def handle_card_action(event_data: Dict[str, Any]) -> Dict[str, Any]:
                 })
             }
         
+        # Mark draft as submitting to prevent duplicate submissions
+        user_cases = s3_get_cases_by_user(user_id, limit=10)
+        drafts = [c for c in user_cases if c.get('status') == 'draft']
+        if not drafts:
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({
+                    "toast": {
+                        "type": "info",
+                        "content": "工单提交中，请勿重复点击" if DEFAULT_LANGUAGE == 'zh' else "Case is being submitted, please wait..."
+                    }
+                })
+            }
+        update_case(drafts[0]['case_id'], {'status': 'submitting'})
+
         try:
             import boto3
             lambda_client = boto3.client('lambda')
