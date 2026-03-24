@@ -2485,6 +2485,14 @@ def process_case_submission_async(action_value: Dict[str, Any],
             created_by_open_id=created_by_open_id
         )
         
+        # Recall the creation card to prevent re-submission
+        card_message_id = draft.get('card_message_id')
+        if card_message_id:
+            try:
+                recall_message(card_message_id)
+            except Exception as e:
+                print(f"Failed to recall card after submission: {e}")
+
         # Send success message (using rich text format for bold)
         issue_type_name = ISSUE_TYPES.get(issue_type, {}).get('name', issue_type)
         
@@ -2621,7 +2629,7 @@ def handle_card_action(event_data: Dict[str, Any]) -> Dict[str, Any]:
                 'body': json.dumps({
                     "toast": {
                         "type": "info",
-                        "content": "工单提交中，请勿重复点击" if DEFAULT_LANGUAGE == 'zh' else "Case is being submitted, please wait..."
+                        "content": get_message(DEFAULT_LANGUAGE, 'case_already_submitting')
                     }
                 })
             }
