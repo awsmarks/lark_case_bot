@@ -1523,7 +1523,13 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
     # Now detect user language based on message text (command language)
     user_lang = get_user_language(user_id=user_id, open_id=open_id, token_func=get_tenant_access_token, message_text=text)
     print(f"User language detected: {user_lang}, from text: {text[:50] if text else 'empty'}")
-    
+
+    # Bare mention with no content (e.g. user only @bot, or an empty DM): show help.
+    # After stripping the mention key above, text is '' in that case.
+    if not text:
+        text = '帮助' if user_lang == 'zh' else 'help'
+        print(f"Empty message text, defaulting to help command: '{text}'")
+
     # Handle commands with multi-language support
     # Check for create case command
     matched, cmd_lang, subject = match_command(text, 'create_case')
@@ -1693,9 +1699,10 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
         
         return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
     
-    elif text in ['help', '帮助']:
-        # Detect language from command (default to Chinese)
-        is_chinese = text != 'help'
+    elif text.lower() == 'help' or text == '帮助':
+        # Detect language from command (default to Chinese).
+        # English 'help' is case-insensitive (Help/HELP/heLP all work).
+        is_chinese = text == '帮助'
         
         # Show different help info based on context and language
         if chat_type == 'p2p':
@@ -1775,7 +1782,7 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
         
         return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
     
-    elif text.startswith('history') or text.startswith('历史'):
+    elif text.lower().startswith('history') or text.startswith('历史'):
         is_chinese = DEFAULT_LANGUAGE == 'zh'
         # Use global default language for bot responses
         no_history_msg = get_message(DEFAULT_LANGUAGE, 'no_history')
@@ -1946,8 +1953,8 @@ def handle_case_chat_message(case_info: Dict[str, Any], message: Dict[str, Any],
     print(f"Case chat message - has_bot_mention: {has_bot_mention}, is_reply: {bool(parent_id)}, mentions: {len(mentions)}, text after removing mentions: '{text}'")
     
     # Case chat specific help command (support both Chinese and English)
-    if text in ['help', '帮助']:
-        # Detect language from command
+    if text.lower() == 'help' or text == '帮助':
+        # Detect language from command. English 'help' is case-insensitive.
         is_chinese = text == '帮助'
         display_id = case_info.get('display_id', case_info.get('case_id'))
         support_url = f"https://support.console.aws.amazon.com/support/home#/case/?displayId={display_id}"
