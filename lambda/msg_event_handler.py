@@ -1502,16 +1502,19 @@ def handle_message_receive(event_data: Dict[str, Any]) -> Dict[str, Any]:
         mentions = message.get('mentions', [])
         bot_mentioned = False
         bot_open_id = get_bot_open_id()
+        raw_text = text  # text as received, before mention keys are stripped
         
-        # Check if THIS bot was mentioned (not just any @mention)
+        # Check if THIS bot was mentioned (not just any @mention).
+        # Require the mention key to be present in the current text so that mentions
+        # inherited from a quoted/replied message do not falsely trigger the bot.
         for mention in mentions:
             mention_key = mention.get('key', '')
             mention_open_id = mention.get('id', {}).get('open_id', '')
-            
-            if mention_key and mention_open_id == bot_open_id:
-                # Only remove bot mention and set flag when it's actually the bot
-                text = text.replace(mention_key, '').strip()
+            if not mention_key:
+                continue
+            if mention_open_id == bot_open_id and mention_key in raw_text:
                 bot_mentioned = True
+            text = text.replace(mention_key, '').strip()
         
         # In regular group chat, ignore message if bot not mentioned
         if not bot_mentioned:
@@ -1920,20 +1923,27 @@ def handle_case_chat_message(case_info: Dict[str, Any], message: Dict[str, Any],
         return {'statusCode': 200, 'body': json.dumps({'message': 'OK'})}
     
     # Check if THIS bot was @mentioned (not just any user @mention)
+    # IMPORTANT: only count it as a real @bot if the mention key actually appears in
+    # THIS message's text. Feishu/Lark includes mentions inherited from a quoted/replied
+    # message in `message.mentions`, so a plain internal-discussion reply to an earlier
+    # "@bot ..." message would otherwise be misclassified and synced to AWS Support.
     mentions = message.get('mentions', [])
     has_bot_mention = False
     bot_oid = get_bot_open_id()
+    raw_text = text  # text as received, before mention keys are stripped
+    parent_id = message.get('parent_id', '')
     for mention in mentions:
         mention_key = mention.get('key', '')
         mention_open_id = mention.get('id', {}).get('open_id', '')
-        if mention_key and mention_open_id == bot_oid:
+        if not mention_key:
+            continue
+        # Only flag the bot when its mention key is present in the current message text.
+        if mention_open_id == bot_oid and mention_key in raw_text:
             has_bot_mention = True
-            text = text.replace(mention_key, '').strip()
-        elif mention_key:
-            # Other user @mentioned — remove the mention tag but don't set bot flag
-            text = text.replace(mention_key, '').strip()
+        # Strip the mention placeholder from the text regardless of who was mentioned.
+        text = text.replace(mention_key, '').strip()
     
-    print(f"Case chat message - has_bot_mention: {has_bot_mention}, text after removing mentions: '{text}'")
+    print(f"Case chat message - has_bot_mention: {has_bot_mention}, is_reply: {bool(parent_id)}, mentions: {len(mentions)}, text after removing mentions: '{text}'")
     
     # Case chat specific help command (support both Chinese and English)
     if text in ['help', '帮助']:
